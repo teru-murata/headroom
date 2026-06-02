@@ -1003,6 +1003,13 @@ class HeadroomProxy(
             logger.info("Magika: ENABLED (ML content detection)")
 
         if self.memory_handler:
+            if (
+                self.config.memory_backend == "qdrant-neo4j"
+                and not self.config.memory_neo4j_password
+            ):
+                logger.warning(
+                    "NEO4J password is not set — using default credentials is insecure in production"
+                )
             self.warmup.memory_backend.mark_loading()
             try:
                 await self.memory_handler.ensure_initialized()
@@ -1300,7 +1307,11 @@ class HeadroomProxy(
                 )
                 await asyncio.sleep(delay_with_jitter / 1000)
 
-        raise last_error  # type: ignore[misc]
+        if last_error is None:
+            raise RuntimeError(
+                "retry loop exhausted with no error recorded; retry_max_attempts must be >= 1"
+            )
+        raise last_error
 
 
 async def _log_toin_stats_periodically(interval_seconds: int = 300) -> None:
@@ -1464,7 +1475,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         app.state.started_at = time.time()
         app.state.ready = False
         app.state.startup_error = None
-        initialize_context_tool_session_baseline()
+        await initialize_context_tool_session_baseline()
 
         try:
             try:
@@ -1920,7 +1931,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
 
         # Fetch CLI filtering savings from the selected context tool. These
         # tokens are avoided before they reach model context.
-        cli_filtering_stats = _get_context_tool_stats()
+        cli_filtering_stats = await asyncio.to_thread(_get_context_tool_stats)
         cli_filtering_tool = (
             str(cli_filtering_stats.get("tool", "rtk")) if cli_filtering_stats else "rtk"
         )
@@ -2321,7 +2332,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         await proxy.metrics.reset_runtime()
         if proxy.cost_tracker:
             proxy.cost_tracker.reset_runtime()
-        initialize_context_tool_session_baseline()
+        await initialize_context_tool_session_baseline()
         async with _stats_snapshot_lock:
             _stats_snapshot["value"] = None
             _stats_snapshot["expires_at"] = 0.0
@@ -2417,7 +2428,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         )
 
     # Debug endpoints
-    @app.get("/debug/memory")
+    @app.get("/debug/memory", dependencies=[Depends(_require_loopback)])
     async def debug_memory():
         """Get detailed memory usage statistics.
 
