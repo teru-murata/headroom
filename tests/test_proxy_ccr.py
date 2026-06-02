@@ -27,7 +27,23 @@ def client():
         cost_tracking_enabled=False,
     )
     app = create_app(config)
-    with TestClient(app) as client:
+    with TestClient(app, client=("127.0.0.1", 12345)) as client:
+        yield client
+    reset_compression_store()
+
+
+@pytest.fixture
+def external_client():
+    """Test client with a non-loopback address for retrieve guard checks."""
+    reset_compression_store()
+    config = ProxyConfig(
+        optimize=False,
+        cache_enabled=False,
+        rate_limit_enabled=False,
+        cost_tracking_enabled=False,
+    )
+    app = create_app(config)
+    with TestClient(app, client=("10.0.0.1", 54321)) as client:
         yield client
     reset_compression_store()
 
@@ -297,6 +313,35 @@ class TestCCRStatsEndpoint:
         retrieval_types = [r["retrieval_type"] for r in data["recent_retrievals"]]
         assert "full" in retrieval_types
         assert "search" in retrieval_types
+
+
+class TestCCRLoopbackGuard:
+    """CCR retrieve endpoints expose originals or hashes and stay loopback-only."""
+
+    def test_post_retrieve_returns_404_for_non_loopback(self, external_client):
+        response = external_client.post("/v1/retrieve", json={"hash": "abc123"})
+        assert response.status_code == 404
+
+    def test_get_retrieve_returns_404_for_non_loopback(self, external_client):
+        response = external_client.get("/v1/retrieve/abc123")
+        assert response.status_code == 404
+
+    def test_tool_call_retrieve_returns_404_for_non_loopback(self, external_client):
+        response = external_client.post(
+            "/v1/retrieve/tool_call",
+            json={
+                "provider": "anthropic",
+                "tool_call": {
+                    "name": "headroom_retrieve",
+                    "input": {"hash": "abc123def456abc123def456"},
+                },
+            },
+        )
+        assert response.status_code == 404
+
+    def test_retrieve_stats_returns_404_for_non_loopback(self, external_client):
+        response = external_client.get("/v1/retrieve/stats")
+        assert response.status_code == 404
 
 
 class TestCCRIntegration:

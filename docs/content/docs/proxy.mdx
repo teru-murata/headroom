@@ -22,6 +22,9 @@ headroom proxy \
 
 Telemetry is enabled by default. Opt out with `HEADROOM_TELEMETRY=off` or `--no-telemetry`.
 
+CCR retrieve routes that can expose cached originals or retrieval hashes are loopback-only.
+Binding the proxy to `0.0.0.0` does not make `/v1/retrieve*` available to non-loopback clients; shared remote proxy mode needs an explicit auth and namespace policy.
+
 ## CLI options
 
 ### Core
