@@ -1,12 +1,12 @@
 ---
 title: Reversible Compression (CCR)
-description: Compress-Cache-Retrieve architecture that makes compression lossless — the LLM can always get the original data back.
+description: Compress-Cache-Retrieve architecture that caches omitted originals so the LLM can retrieve them while the backing store retains them.
 ---
 
-Headroom's CCR (Compress-Cache-Retrieve) architecture makes compression **reversible**. When content is compressed, the original data is cached locally. If the LLM needs the full data, it retrieves it instantly.
+Headroom's CCR (Compress-Cache-Retrieve) architecture makes compression **retrievable** within the active store's retention guarantees. When content is compressed, the original data is cached locally. If the LLM needs the full data while that cache entry is still available, it can retrieve it through Headroom.
 
-<Callout type="info" title="Nothing is ever thrown away">
-  Unlike traditional lossy compression, CCR guarantees that every piece of original data remains accessible. You get 70-90% token savings with zero risk of permanent data loss.
+<Callout type="info" title="Retrieval depends on the backing store">
+  The shipped CCR backend is in-memory with a default 5 minute TTL. It is process-local and does not survive restarts. Durable SQLite/Redis-style CCR backends are roadmap work, not shipped first-party backends in this repository.
 </Callout>
 
 ## The problem with traditional compression
@@ -16,7 +16,7 @@ Traditional compression forces a difficult tradeoff:
 - **Aggressive compression** risks losing data the LLM needs
 - **Conservative compression** misses out on token savings
 
-CCR eliminates this tradeoff entirely. Compress aggressively, retrieve on demand.
+CCR reduces this tradeoff by keeping a retrievable original while the cache entry is live. Compress aggressively only when the retention window and backend guarantees fit the workflow.
 
 ## Architecture
 
@@ -45,6 +45,17 @@ When SmartCrusher compresses tool output:
 ```
 [1000 items compressed to 20. Retrieve more: hash=abc123]
 ```
+
+### Storage guarantees
+
+| Backend | Shipped status | Retention behavior | Notes |
+|---|---|---|---|
+| In-memory | Shipped default | Default 5 minute TTL; process-local | Entries are lost on restart and are not shared across worker processes. |
+| Entry-point backend | Supported extension point | Backend-defined | `HEADROOM_CCR_BACKEND` loads adapters registered under `headroom.ccr_backend`. |
+| SQLite | Roadmap / third-party only | Not guaranteed by this repo | No first-party SQLite CCR backend is currently shipped. |
+| Redis | Roadmap / third-party only | Not guaranteed by this repo | No first-party Redis CCR backend is currently shipped. |
+
+For local development, the default in-memory store is enough to let the model recover recently omitted content. For long-lived sessions, restart survival, or multi-worker/team proxy deployments, use or implement a durable backend and define namespace/auth policy explicitly.
 
 ## Phase 2: Tool Injection
 
@@ -107,7 +118,7 @@ The LLM does not have to retrieve everything. It can search within compressed da
 }
 ```
 
-This runs a BM25 search over the cached items, returning only the relevant subset instead of the full original payload.
+This runs a BM25 search over the cached items, returning only the relevant subset instead of the full original payload. Search only works while the entry exists in the active store.
 
 ## Retrieving originals
 
@@ -197,6 +208,6 @@ When users retrieve dropped messages via CCR, TOIN learns those message patterns
 |---|---|---|
 | No compression | None | 0% |
 | Traditional compression | Data loss | 70-90% |
-| CCR compression | None (reversible) | 70-90% |
+| CCR compression | Lower while cache entry is live | 70-90% |
 
-CCR gives you the savings of aggressive compression with zero risk. The LLM can always retrieve the original data if needed.
+CCR gives you the savings of aggressive compression while preserving a retrieval path for live cache entries. It is not a permanent durability guarantee unless the configured backend provides one.

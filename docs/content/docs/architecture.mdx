@@ -108,13 +108,15 @@ After the pipeline, Headroom applies provider-specific cache hints:
 
 ## CCR: Compress-Cache-Retrieve
 
-When SmartCrusher compresses a tool output or Intelligent Context drops messages, the original content is stored in a local compression cache. If the LLM needs the full data, it can request retrieval via a `ccr_retrieve` tool call. This makes compression reversible.
+When SmartCrusher compresses a tool output or Intelligent Context drops messages, the original content is stored in the CCR compression cache. If the LLM needs the full data while the cache entry is still available, it can request retrieval via a `ccr_retrieve` tool call. This makes compression reversible within the active store's retention guarantees.
 
 ```
 Compress:  1000 items  ->  15 items  (stored original in CCR)
-Cache:     Hash-indexed local store (SQLite)
+Cache:     Hash-indexed in-memory store by default (5 minute TTL)
 Retrieve:  LLM calls ccr_retrieve("abc123")  ->  original 1000 items
 ```
+
+The shipped backend is `InMemoryBackend`. It is process-local and does not survive restarts; multi-worker deployments have one CCR store per worker unless a request-scoped or third-party backend is installed. `HEADROOM_CCR_BACKEND` can load external backends through the `headroom.ccr_backend` entry point, but this repository does not currently ship first-party SQLite or Redis CCR backends.
 
 ## TOIN: Tool Output Intelligence Network
 
