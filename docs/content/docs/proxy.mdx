@@ -11,7 +11,9 @@ The Headroom proxy is a standalone HTTP server that compresses all LLM traffic p
 # Basic usage
 headroom proxy
 
-# Custom host and port
+# Custom host and port.
+# This exposes the main proxy API on the network, but CCR retrieve routes
+# remain loopback-only until shared remote proxy mode is implemented.
 headroom proxy --host 0.0.0.0 --port 8080
 
 # With logging and budget
@@ -257,6 +259,9 @@ headroom proxy
 ```
 
 ## Production deployment
+
+Remote/shared proxy deployment is roadmap work, not a complete security mode.
+If you bind the proxy outside loopback, add your own network access control and keep in mind that `/v1/retrieve*` stays loopback-only until the auth and namespace policy tracked in the fork roadmap is implemented.
 
 ### gunicorn
 

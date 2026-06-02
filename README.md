@@ -111,7 +111,7 @@ The current README is intentionally split between shipped behavior and roadmap i
 | CCR makes compression reversible | Experimental | Default storage is local cache with TTL; durable backends are roadmap. | [#8](https://github.com/teru-murata/headroom/issues/8), [#13](https://github.com/teru-murata/headroom/issues/13) |
 | CacheAligner improves provider cache hits | Under audit | Current implementation is detector-only; net cache savings need measurement. | [#2](https://github.com/teru-murata/headroom/issues/2), [#6](https://github.com/teru-murata/headroom/issues/6), [#15](https://github.com/teru-murata/headroom/issues/15) |
 | Conversation history is compressed | Roadmap | Codex/OpenAI Responses protects user/system/assistant prefix content by design. | [#7](https://github.com/teru-murata/headroom/issues/7) |
-| Public proxy deployment is safe by default | Roadmap / safety work | Local mode is default; remote mode needs auth, namespace, and retrieve policy. | [#1](https://github.com/teru-murata/headroom/issues/1), [#10](https://github.com/teru-murata/headroom/issues/10), [#18](https://github.com/teru-murata/headroom/issues/18) |
+| Remote/shared proxy mode | Roadmap / safety work | Local mode is shipped; shared remote mode needs auth, namespace, and retrieve policy. | [#10](https://github.com/teru-murata/headroom/issues/10), [#18](https://github.com/teru-murata/headroom/issues/18) |
 | 60–95% fewer tokens | Benchmark claim | Keep headline numbers tied to reproducible traces, task accuracy, cache impact, and retrieve rate. | [#11](https://github.com/teru-murata/headroom/issues/11), [#14](https://github.com/teru-murata/headroom/issues/14) |
 
 ## How it works (30 seconds)
