@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 230" role="img" aria-labelledby="title desc">
+  <title id="title">Headroom teru-murata fork logo</title>
+  <desc id="desc">A fork-branded Headroom logo for coding-agent context middleware.</desc>
+  <rect width="920" height="230" rx="22" fill="#f7f5ee"/>
+  <rect x="22" y="22" width="876" height="186" rx="18" fill="#101820"/>
+  <g transform="translate(48 46)">
+    <path d="M0 88 C78 16 160 16 238 88 C316 160 398 160 476 88" fill="none" stroke="#70e000" stroke-width="10" stroke-linecap="round"/>
+    <path d="M502 28 L502 140" stroke="#f7f5ee" stroke-width="9" stroke-linecap="round"/>
+    <path d="M476 28 L476 62 M502 28 L502 62 M528 28 L528 62" stroke="#f7f5ee" stroke-width="9" stroke-linecap="round"/>
+    <path d="M476 62 C476 82 528 82 528 62" fill="none" stroke="#f7f5ee" stroke-width="9" stroke-linecap="round"/>
+    <path d="M548 86 C614 28 690 28 756 86" fill="none" stroke="#38bdf8" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <text x="52" y="102" fill="#f7f5ee" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="58" font-weight="900" letter-spacing="2">HEADROOM</text>
+  <text x="55" y="147" fill="#70e000" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" letter-spacing="4">TERU-MURATA FORK</text>
+  <text x="55" y="178" fill="#d9e2dc" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">reversible / cache-aware / source-attributed context middleware</text>
+  <g transform="translate(700 52)">
+    <rect x="0" y="0" width="150" height="48" rx="24" fill="#f7f5ee"/>
+    <text x="75" y="31" text-anchor="middle" fill="#101820" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="900">FORK MODE</text>
+  </g>
+</svg>
