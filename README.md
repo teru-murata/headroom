@@ -5,14 +5,15 @@
   ██╔══██║██╔══╝  ██╔══██║██║  ██║██╔══██╗██║   ██║██║   ██║██║╚██╔╝██║
   ██║  ██║███████╗██║  ██║██████╔╝██║  ██║╚██████╔╝╚██████╔╝██║ ╚═╝ ██║
   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚═╝     ╚═╝
-                  The context compression layer for AI agents
+                  teru-murata fork: coding-agent context middleware
 ```
 
 <p align="center"><strong>reversible · cache-aware · provenance-focused · coding-agent context middleware</strong></p>
 
 <p align="center">
-  <a href="https://github.com/chopratejas/headroom/actions/workflows/ci.yml"><img src="https://github.com/chopratejas/headroom/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://app.codecov.io/gh/chopratejas/headroom"><img src="https://codecov.io/gh/chopratejas/headroom/graph/badge.svg" alt="codecov"></a>
+  <a href="https://github.com/teru-murata/headroom/actions/workflows/ci.yml"><img src="https://github.com/teru-murata/headroom/actions/workflows/ci.yml/badge.svg" alt="Fork CI"></a>
+  <a href="https://github.com/teru-murata/headroom/issues"><img src="https://img.shields.io/badge/fork%20roadmap-issues-blue" alt="Fork roadmap"></a>
+  <a href="https://github.com/chopratejas/headroom"><img src="https://img.shields.io/badge/upstream-chopratejas%2Fheadroom-lightgrey" alt="Upstream"></a>
   <a href="https://pypi.org/project/headroom-ai/"><img src="https://img.shields.io/pypi/v/headroom-ai.svg" alt="PyPI"></a>
   <a href="https://www.npmjs.com/package/headroom-ai"><img src="https://img.shields.io/npm/v/headroom-ai.svg" alt="npm"></a>
   <a href="https://huggingface.co/chopratejas/kompress-base"><img src="https://img.shields.io/badge/model-Kompress--base-yellow.svg" alt="Model: Kompress-base"></a>
@@ -22,9 +23,11 @@
 </p>
 
 <p align="center">
-  <a href="https://headroom-docs.vercel.app/docs">Docs</a> ·
+  <a href="#about-this-fork">This fork</a> ·
+  <a href="#roadmap-and-tracking">Roadmap</a> ·
+  <a href="https://headroom-docs.vercel.app/docs">Upstream docs</a> ·
   <a href="#get-started-60-seconds">Install</a> ·
-  <a href="#proof">Proof</a> ·
+  <a href="#claim-audit-matrix">Claims</a> ·
   <a href="#agent-compatibility-matrix">Agents</a> ·
   <a href="https://discord.gg/yRmaUNpsPJ">Discord</a> ·
   <a href="llms.txt">llms.txt</a>
@@ -35,6 +38,22 @@
 </sub></p>
 
 ---
+
+## About this fork
+
+This repository is the `teru-murata/headroom` fork of [`chopratejas/headroom`](https://github.com/chopratejas/headroom). Upstream provides the package, runtime, proxy, MCP server, and compression pipeline this fork builds on. This fork keeps that base, but takes ownership of a narrower product direction:
+
+> reversible, cache-aware, source-attributed context middleware for AI coding agents.
+
+The fork policy is simple:
+
+- keep shipped behavior honest in the README;
+- keep ambitious ideas visible as roadmap Issues instead of marketing claims;
+- focus on coding-agent context waste: tool outputs, logs, search results, file trees, diffs, schemas, RAG chunks, MCP results, and prior context;
+- treat sandbox/code-execution systems as complementary inputs, not enemies;
+- make reversibility, provider cacheability, and token provenance first-class design constraints.
+
+Fork-specific roadmap and claim tracking live in [Issues](https://github.com/teru-murata/headroom/issues). Upstream documentation remains useful for installation and existing APIs, but this README describes the direction of this fork.
 
 > Headroom is a reversible, cache-aware context compression layer for AI coding agents. It focuses on high-noise surrounding context — tool outputs, logs, search results, file trees, diffs, schemas, RAG chunks, MCP results, and structured payloads — while preserving exact retrieval of omitted originals where CCR is available.
 
@@ -286,6 +305,8 @@ pipx install --python python3.13 "headroom-ai[all]"
 
 ## Documentation
 
+The links below point to upstream documentation for the current package and runtime. Fork-specific positioning, roadmap, and claim status are tracked in this README and in [`teru-murata/headroom` Issues](https://github.com/teru-murata/headroom/issues).
+
 | Start here                                                                    | Go deeper                                                                          |
 |-------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
 | [Quickstart](https://headroom-docs.vercel.app/docs/quickstart)                | [Architecture](https://headroom-docs.vercel.app/docs/architecture)                 |
@@ -312,11 +333,11 @@ Headroom runs **locally**, targets high-noise context across major agent workflo
 ## Contributing
 
 ```bash
-git clone https://github.com/chopratejas/headroom.git && cd headroom
+git clone https://github.com/teru-murata/headroom.git && cd headroom
 pip install -e ".[dev]" && pytest
 ```
 
-Devcontainers in `.devcontainer/` (default + `memory-stack` with Qdrant & Neo4j). See [CONTRIBUTING.md](CONTRIBUTING.md).
+Fork roadmap discussions happen in [Issues](https://github.com/teru-murata/headroom/issues). Devcontainers live in `.devcontainer/` (default + `memory-stack` with Qdrant & Neo4j). See [CONTRIBUTING.md](CONTRIBUTING.md). For upstream-first contributions, use [`chopratejas/headroom`](https://github.com/chopratejas/headroom).
 
 ## Community
 
