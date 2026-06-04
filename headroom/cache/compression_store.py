@@ -413,11 +413,46 @@ class CompressionStore:
             # The entry contains mutable fields (search_queries list) that must be copied
             result_entry = replace(entry, search_queries=list(entry.search_queries))
 
+        self._emit_ledger_retrieved_event(hash_key, result_entry, query)
+
         # Process feedback immediately to ensure TOIN learns in real-time
         if self._enable_feedback:
             self.process_pending_feedback()
 
         return result_entry
+
+    def _emit_ledger_retrieved_event(
+        self,
+        hash_key: str,
+        entry: CompressionEntry,
+        query: str | None,
+    ) -> None:
+        try:
+            from ..telemetry.ledger import LedgerEvent, get_ledger_emitter
+
+            get_ledger_emitter().emit(
+                LedgerEvent.create(
+                    "bridge.ccr.retrieved",
+                    source_id=entry.tool_signature_hash,
+                    source_type=entry.compression_strategy,
+                    original_tokens=entry.original_tokens or None,
+                    compressed_tokens=entry.compressed_tokens or None,
+                    saved_tokens=max(entry.original_tokens - entry.compressed_tokens, 0)
+                    if entry.original_tokens and entry.compressed_tokens
+                    else None,
+                    compression_method=entry.compression_strategy,
+                    ccr_marker_id=hash_key,
+                    ccr_backend=type(self._backend).__name__,
+                    retrieved_count=entry.retrieval_count,
+                    attributes={
+                        "query_present": query is not None,
+                        "original_item_count": entry.original_item_count,
+                        "compressed_item_count": entry.compressed_item_count,
+                    },
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Ledger CCR retrieve event failed for %s: %s", hash_key, exc)
 
     def get_metadata(
         self,

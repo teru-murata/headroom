@@ -1,0 +1,78 @@
+---
+title: Telemetry
+description: Local provenance ledger export and OpenTelemetry-compatible attributes.
+---
+
+Headroom can emit local ledger-compatible provenance events for compression and
+CCR retrieval. This is a producer-side local/offline path, not a hosted ledger
+service.
+
+## Local JSONL Ledger
+
+Enable JSONL export with environment variables:
+
+```bash
+HEADROOM_LEDGER_ENABLED=true
+HEADROOM_LEDGER_JSONL_PATH=.headroom/ledger/events.jsonl
+HEADROOM_LEDGER_PROJECT_ID=local
+HEADROOM_LEDGER_SESSION_ID=session-001
+```
+
+When enabled, Headroom appends one JSON object per event. Local defaults fill
+unknown identity fields:
+
+| Field | Default |
+|---|---|
+| `tenant_id` | `local` |
+| `project_id` | `local` or `HEADROOM_LEDGER_PROJECT_ID` |
+| `session_id` | `local` or `HEADROOM_LEDGER_SESSION_ID` |
+| `deployment_mode` | `local_dev` |
+| `bridge_instance_id` | `headroom-local` |
+
+Event names use the `bridge.*` namespace, for example
+`bridge.compression.completed`, `bridge.compression.bypassed`, and
+`bridge.ccr.retrieved`.
+
+## Source Fields
+
+Compression events include source-level fields such as:
+
+- `source_type`
+- `source_path`
+- `original_tokens`
+- `compressed_tokens`
+- `saved_tokens`
+- `compression_method`
+- `ccr_marker_id`
+- `accuracy_guard`
+
+Token counts are deterministic local estimates when no provider tokenizer is
+available. The current method is `estimated_chars_div_4`; these are not exact
+provider billing tokens.
+
+## OpenTelemetry Attributes
+
+Headroom exposes OpenTelemetry-compatible attribute dictionaries with `bridge.*`
+keys, including:
+
+```text
+bridge.event_id
+bridge.event_type
+bridge.tenant_id
+bridge.project_id
+bridge.session_id
+bridge.request_id
+bridge.source_id
+bridge.provider_request_id
+bridge.original_tokens
+bridge.compressed_tokens
+bridge.saved_tokens
+bridge.compression_method
+bridge.ccr_marker_id
+bridge.source_type
+bridge.accuracy_guard
+```
+
+Hosted ingest, retention, reconciliation, billing, dashboards, and long-term
+analytics belong to coding-agent-bridge. Headroom only emits local
+ledger-compatible producer events.

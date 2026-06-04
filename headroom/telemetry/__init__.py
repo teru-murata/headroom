@@ -60,6 +60,17 @@ from .collector import (
     get_telemetry_collector,
     reset_telemetry_collector,
 )
+from .ledger import (
+    InMemoryLedgerEmitter,
+    JsonlLedgerEmitter,
+    LedgerEmitter,
+    LedgerEvent,
+    NullLedgerEmitter,
+    event_to_otel_attributes,
+    get_ledger_emitter,
+    reset_ledger_emitter,
+    set_ledger_emitter,
+)
 from .models import (
     AnonymizedToolStats,
     CompressionEvent,
@@ -88,6 +99,16 @@ __all__ = [
     "TelemetryConfig",
     "get_telemetry_collector",
     "reset_telemetry_collector",
+    # Ledger
+    "InMemoryLedgerEmitter",
+    "JsonlLedgerEmitter",
+    "LedgerEmitter",
+    "LedgerEvent",
+    "NullLedgerEmitter",
+    "event_to_otel_attributes",
+    "get_ledger_emitter",
+    "reset_ledger_emitter",
+    "set_ledger_emitter",
     # Models
     "AnonymizedToolStats",
     "CompressionEvent",

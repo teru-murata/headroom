@@ -180,8 +180,13 @@ class CodingAgentPresetResult:
 class CodingAgentPreset:
     """Route noisy coding-agent context sources to deterministic compressors."""
 
-    def __init__(self, config: CodingAgentPresetConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: CodingAgentPresetConfig | None = None,
+        ledger_emitter: Any | None = None,
+    ) -> None:
         self.config = config or CodingAgentPresetConfig()
+        self._ledger_emitter = ledger_emitter
 
     def route_and_compress(
         self,
@@ -197,24 +202,27 @@ class CodingAgentPreset:
 
         context = str(metadata.get("context") or metadata.get("query") or "")
         if source == "test_log":
-            return self._compress_log(source, text, metadata, context)
-        if source == "build_log":
-            return self._compress_log(source, text, metadata, context)
-        if source == "search_results":
-            return self._compress_search(text, metadata, context)
-        if source == "file_tree":
-            return self._compress_file_tree(text, metadata, context)
-        if source == "git_diff":
-            return self._compress_diff(text, metadata, context)
-        if source in {"package_metadata", "lockfile"}:
-            return self._compress_package_metadata(source, text, metadata)
-        if source in {"mcp_tool_response", "api_db_response"}:
-            return self._compress_mcp_tool_response(source, text, metadata)
-        if source == "schema_or_openapi":
-            return self._compress_generic_tool_output(source, text, metadata)
-        if source == "source_code":
-            return self._passthrough_source_code(text, metadata)
-        return self._compress_generic_tool_output("generic_tool_output", text, metadata)
+            result = self._compress_log(source, text, metadata, context)
+        elif source == "build_log":
+            result = self._compress_log(source, text, metadata, context)
+        elif source == "search_results":
+            result = self._compress_search(text, metadata, context)
+        elif source == "file_tree":
+            result = self._compress_file_tree(text, metadata, context)
+        elif source == "git_diff":
+            result = self._compress_diff(text, metadata, context)
+        elif source in {"package_metadata", "lockfile"}:
+            result = self._compress_package_metadata(source, text, metadata)
+        elif source in {"mcp_tool_response", "api_db_response"}:
+            result = self._compress_mcp_tool_response(source, text, metadata)
+        elif source == "schema_or_openapi":
+            result = self._compress_generic_tool_output(source, text, metadata)
+        elif source == "source_code":
+            result = self._passthrough_source_code(text, metadata)
+        else:
+            result = self._compress_generic_tool_output("generic_tool_output", text, metadata)
+        self._emit_ledger_event(result, metadata)
+        return result
 
     def compress(
         self,
@@ -847,6 +855,70 @@ class CodingAgentPreset:
             ccr_marker=ccr_marker,
             metadata=result_metadata,
         )
+
+    def _emit_ledger_event(
+        self,
+        result: CodingAgentPresetResult,
+        request_metadata: dict[str, Any],
+    ) -> None:
+        try:
+            from headroom.telemetry.ledger import (
+                TOKEN_COUNT_METHOD,
+                LedgerEvent,
+                estimate_tokens,
+                get_ledger_emitter,
+            )
+
+            emitter = self._ledger_emitter or get_ledger_emitter()
+            original_tokens = int(
+                result.metadata.get("original_tokens") or estimate_tokens(result.original)
+            )
+            compressed_tokens = int(
+                result.metadata.get("compressed_tokens") or estimate_tokens(result.compressed)
+            )
+            saved_tokens = max(0, original_tokens - compressed_tokens)
+            event_type = (
+                "bridge.compression.bypassed"
+                if result.compression_method == "source_code_passthrough" or saved_tokens == 0
+                else "bridge.compression.completed"
+            )
+            emitter.emit(
+                LedgerEvent.create(
+                    event_type,
+                    source_id=str(
+                        request_metadata.get("source_id")
+                        or result.metadata.get("source_id")
+                        or (
+                            f"{result.source_type}:"
+                            f"{hashlib.sha256(result.original.encode()).hexdigest()[:16]}"
+                        )
+                    ),
+                    source_type=result.source_type,
+                    source_path=request_metadata.get("source_path")
+                    or request_metadata.get("path")
+                    or request_metadata.get("filename"),
+                    provider=request_metadata.get("provider"),
+                    model=request_metadata.get("model"),
+                    provider_request_id=request_metadata.get("provider_request_id"),
+                    turn_id=request_metadata.get("turn_id"),
+                    cache_zone=request_metadata.get("cache_zone"),
+                    original_tokens=original_tokens,
+                    compressed_tokens=compressed_tokens,
+                    saved_tokens=saved_tokens,
+                    token_count_method=TOKEN_COUNT_METHOD,
+                    compression_method=result.compression_method,
+                    ccr_marker_id=result.ccr_hash,
+                    ccr_backend="local" if result.ccr_hash else None,
+                    accuracy_guard=result.accuracy_guard,
+                    attributes={
+                        "original_length": result.original_length,
+                        "compressed_length": result.compressed_length,
+                        "saved_length": result.saved_length,
+                    },
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Ledger emission failed for %s: %s", result.source_type, exc)
 
     def _short_json(self, value: Any, *, limit: int = 240) -> str:
         if isinstance(value, str):
