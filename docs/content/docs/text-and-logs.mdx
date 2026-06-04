@@ -10,6 +10,7 @@ Headroom provides specialized compressors for text-based content that isn't JSON
 | `SearchCompressor` | grep/ripgrep output | Relevant matches, file diversity | 80-95% |
 | `LogCompressor` | Build/test logs | Errors, stack traces, summaries | 85-95% |
 | `DiffCompressor` | Unified diffs | Changed lines, context | 60-80% |
+| `FileTreeCompressor` | Repository tree/path listings | Package roots, configs, source/test shape, referenced paths | 50-90% |
 | `TextCompressor` | General text | Relevant paragraphs, anchors | 60-80% |
 | `KompressCompressor` | General text fallback | Learned token scoring via ONNX | 30-50% |
 
@@ -148,6 +149,45 @@ compressor = DiffCompressor()
 result = compressor.compress(diff_output)
 ```
 
+Diff acceptance coverage checks that compressed patches retain file paths and
+status markers, hunk headers, changed public symbols, nearby import changes,
+test-impact paths, and local CCR retrievability for omitted diff content.
+
+## FileTreeCompressor
+
+Compresses repository tree output and path listings while keeping the parts a
+coding agent needs to choose edit targets.
+
+```python
+from headroom.transforms import FileTreeCompressor
+
+tree_output = """
+.
+|-- package.json
+|-- src/
+|   `-- server/
+|       `-- auth.ts
+|-- tests/
+|   `-- server/
+|       `-- auth.test.ts
+`-- node_modules/
+    `-- package_001/
+"""
+
+compressor = FileTreeCompressor()
+result = compressor.compress(tree_output, context="src/server/auth.ts")
+```
+
+**What gets preserved:**
+- Package roots and local configuration files
+- Source and test directory shape
+- Changed or recently referenced paths from the context
+- Depth-limited tree structure around relevant areas
+
+**What gets collapsed:**
+- `node_modules`, `vendor`, `dist`, `build`, `coverage`, `.cache`, and similar generated/cache directories
+- Long repeated generated path lists
+
 ## TextCompressor
 
 General-purpose text compression with anchor preservation. Best for documentation, README files, and prose content.
@@ -201,6 +241,8 @@ if detection.content_type == ContentType.SEARCH_RESULTS:
     result = SearchCompressor().compress(content, context="process")
 elif detection.content_type == ContentType.BUILD_OUTPUT:
     result = LogCompressor().compress(content)
+elif detection.content_type == ContentType.FILE_TREE:
+    result = FileTreeCompressor().compress(content, context="src/main.py")
 elif detection.content_type == ContentType.PLAIN_TEXT:
     result = TextCompressor().compress(content, context="process")
 ```
@@ -214,6 +256,7 @@ The ContentRouter selects the right compressor automatically. Here's when each f
 | `file:line:content` lines | SearchCompressor | grep/ripgrep output format |
 | pytest, npm, cargo markers | LogCompressor | Build tool output patterns |
 | `---/+++` and `@@` markers | DiffCompressor | Unified diff format |
+| `tree`, `find`, or path-listing output | FileTreeCompressor | Branch markers and path shapes |
 | Prose, documentation | TextCompressor | Fallback for non-structured text |
 | Long plain text | KompressCompressor | ContentRouter fallback |
 
@@ -224,5 +267,6 @@ The ContentRouter selects the right compressor automatically. Here's when each f
 | SearchCompressor | 1,000 matches | 30-50 matches | ~2ms |
 | LogCompressor | 5,000 lines | 100-200 lines | ~3ms |
 | DiffCompressor | Large diff | Changed hunks only | ~2ms |
+| FileTreeCompressor | Large repository tree | Structural edit-target tree | ~1ms |
 | TextCompressor | 10,000 chars | 2,000 chars | ~2ms |
 | KompressCompressor | Plain text | 50-70% of original | model-dependent |

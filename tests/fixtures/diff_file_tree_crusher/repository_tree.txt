@@ -1,0 +1,125 @@
+$ tree -a --dirsfirst
+.
+|-- .github/
+|   |-- workflows/
+|   |   |-- ci.yml
+|   |   `-- release.yml
+|-- crates/
+|   |-- headroom-core/
+|   |   |-- Cargo.toml
+|   |   |-- src/
+|   |   |   |-- auth.rs
+|   |   |   |-- lib.rs
+|   |   |   `-- transforms/
+|   |   |       |-- diff_compressor.rs
+|   |   |       `-- log_compressor.rs
+|   |   `-- tests/
+|   |       `-- diff_acceptance.rs
+|-- docs/
+|   |-- content/
+|   |   `-- docs/
+|   |       |-- acceptance-evidence.mdx
+|   |       |-- ccr.mdx
+|   |       `-- text-and-logs.mdx
+|-- headroom/
+|   |-- cache/
+|   |   |-- backends/
+|   |   |   |-- memory.py
+|   |   |   `-- sqlite.py
+|   |   `-- compression_store.py
+|   |-- transforms/
+|   |   |-- content_detector.py
+|   |   |-- content_router.py
+|   |   |-- diff_compressor.py
+|   |   |-- file_tree_compressor.py
+|   |   |-- log_compressor.py
+|   |   `-- smart_crusher.py
+|   `-- proxy/
+|       `-- server.py
+|-- src/
+|   |-- checkout/
+|   |   |-- cart.ts
+|   |   |-- payments.ts
+|   |   |-- session.ts
+|   |   `-- types.ts
+|   |-- server/
+|   |   |-- auth.ts
+|   |   `-- routes/
+|   |       |-- checkout.ts
+|   |       `-- health.ts
+|   `-- shared/
+|       `-- money.ts
+|-- tests/
+|   |-- checkout/
+|   |   |-- cart.test.ts
+|   |   `-- session.test.ts
+|   |-- fixtures/
+|   |   |-- diff_file_tree_crusher/
+|   |   |   |-- checkout_authorization.diff
+|   |   |   `-- repository_tree.txt
+|   |   `-- log_crusher/
+|   |       `-- pytest_failure.txt
+|   `-- test_diff_file_tree_crusher_acceptance.py
+|-- node_modules/
+|   |-- package_001/
+|   |   `-- index.js
+|   |-- package_002/
+|   |   `-- index.js
+|   |-- package_003/
+|   |   `-- index.js
+|   |-- package_004/
+|   |   `-- index.js
+|   |-- package_005/
+|   |   `-- index.js
+|   |-- package_006/
+|   |   `-- index.js
+|   |-- package_007/
+|   |   `-- index.js
+|   |-- package_008/
+|   |   `-- index.js
+|   |-- package_009/
+|   |   `-- index.js
+|   `-- package_010/
+|       `-- index.js
+|-- vendor/
+|   |-- bundle_001/
+|   |   `-- gem.rb
+|   |-- bundle_002/
+|   |   `-- gem.rb
+|   |-- bundle_003/
+|   |   `-- gem.rb
+|   `-- bundle_004/
+|       `-- gem.rb
+|-- dist/
+|   |-- chunk_001.js
+|   |-- chunk_002.js
+|   |-- chunk_003.js
+|   |-- chunk_004.js
+|   |-- chunk_005.js
+|   `-- chunk_006.js
+|-- build/
+|   |-- generated_001.o
+|   |-- generated_002.o
+|   |-- generated_003.o
+|   `-- generated_004.o
+|-- coverage/
+|   |-- html/
+|   |   |-- report_001.html
+|   |   |-- report_002.html
+|   |   `-- report_003.html
+|   `-- lcov.info
+|-- .cache/
+|   |-- entry_001
+|   |-- entry_002
+|   `-- entry_003
+|-- .gitignore
+|-- Cargo.toml
+|-- go.mod
+|-- package.json
+|-- pyproject.toml
+`-- tsconfig.json
+
+M src/server/auth.ts
+M src/checkout/session.ts
+A tests/checkout/session.test.ts
+M crates/headroom-core/src/auth.rs

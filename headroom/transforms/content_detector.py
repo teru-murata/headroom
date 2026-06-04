@@ -10,6 +10,7 @@ Supported content types:
 - SEARCH_RESULTS: grep/ripgrep output (file:line:content)
 - BUILD_OUTPUT: Compiler, test, lint logs
 - GIT_DIFF: Unified diff format
+- FILE_TREE: Repository tree/path listings
 - PLAIN_TEXT: Generic text (fallback)
 """
 
@@ -29,6 +30,7 @@ class ContentType(Enum):
     SEARCH_RESULTS = "search"  # grep/ripgrep output
     BUILD_OUTPUT = "build"  # Compiler, test, lint logs
     GIT_DIFF = "diff"  # Unified diff format
+    FILE_TREE = "file_tree"  # Repository tree/path listings
     HTML = "html"  # Web pages (needs content extraction, not compression)
     PLAIN_TEXT = "text"  # Fallback
 
@@ -46,6 +48,35 @@ class DetectionResult:
 _SEARCH_RESULT_PATTERN = re.compile(
     r"^[^\s:]+:\d+:"  # file:line: format (grep -n style)
 )
+_TREE_BRANCH_PATTERN = re.compile(r"^(?:\|   |    )*(?:\|--|\+--|`--)\s+")
+_TREE_BRANCH_NAME_PATTERN = re.compile(r"(?:\|--|\+--|`--)\s+(?P<name>.+)$")
+_TREE_PATH_PATTERN = re.compile(
+    r"^\s*(?:[MADRCU?!]{1,2}\s+)?(?:\.?[\\/])?[^\s:]+(?:[\\/][^\s:]+)+/?\s*$"
+)
+_TREE_CONFIG_FILES = {
+    ".github",
+    "Cargo.toml",
+    "Dockerfile",
+    "Makefile",
+    "go.mod",
+    "package.json",
+    "pom.xml",
+    "pyproject.toml",
+    "requirements.txt",
+    "tsconfig.json",
+}
+_TREE_PACKAGE_ROOTS = {
+    "app",
+    "cmd",
+    "crates",
+    "headroom",
+    "internal",
+    "lib",
+    "packages",
+    "src",
+    "test",
+    "tests",
+}
 
 # Bug-fix (2026-04-25): extended to recognize merge-commit headers
 # (`diff --combined <path>`, `diff --cc <path>`) and combined-diff hunk
@@ -159,12 +190,17 @@ def detect_content_type(content: str) -> DetectionResult:
     if log_result and log_result.confidence >= 0.5:
         return log_result
 
-    # 6. Check for source code
+    # 6. Check for repository tree/path listings
+    file_tree_result = _try_detect_file_tree(content)
+    if file_tree_result and file_tree_result.confidence >= 0.65:
+        return file_tree_result
+
+    # 7. Check for source code
     code_result = _try_detect_code(content)
     if code_result and code_result.confidence >= 0.5:
         return code_result
 
-    # 7. Fallback to plain text
+    # 8. Fallback to plain text
     return DetectionResult(ContentType.PLAIN_TEXT, 0.5, {})
 
 
@@ -376,6 +412,68 @@ def _try_detect_log(content: str) -> DetectionResult | None:
             "pattern_matches": pattern_matches,
             "error_matches": error_matches,
             "total_lines": non_empty_lines,
+        },
+    )
+
+
+def _try_detect_file_tree(content: str) -> DetectionResult | None:
+    """Try to detect repository tree/path-listing output."""
+    lines = content.split("\n")[:300]
+    if not lines:
+        return None
+
+    tree_lines = 0
+    path_lines = 0
+    config_files = 0
+    package_roots = 0
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _TREE_BRANCH_PATTERN.match(line):
+            tree_lines += 1
+        elif _TREE_PATH_PATTERN.match(line):
+            path_lines += 1
+
+        branch_name = _TREE_BRANCH_NAME_PATTERN.search(line)
+        normalized = (branch_name.group("name").strip() if branch_name else stripped).replace(
+            "\\", "/"
+        )
+        normalized = normalized.rstrip("/")
+        base = normalized.split("/")[-1]
+        if base in _TREE_CONFIG_FILES or normalized in _TREE_CONFIG_FILES:
+            config_files += 1
+        if any(f"/{root}/" in f"/{normalized}/" for root in _TREE_PACKAGE_ROOTS):
+            package_roots += 1
+
+    structural_lines = tree_lines + path_lines
+    if structural_lines < 5:
+        return None
+
+    non_empty_lines = sum(1 for line in lines if line.strip())
+    if non_empty_lines == 0:
+        return None
+
+    ratio = structural_lines / non_empty_lines
+    if ratio < 0.45:
+        return None
+
+    confidence = min(
+        1.0,
+        0.35 + (ratio * 0.35) + min(0.2, config_files * 0.04) + min(0.1, package_roots * 0.02),
+    )
+    if tree_lines:
+        confidence = min(1.0, confidence + 0.1)
+
+    return DetectionResult(
+        ContentType.FILE_TREE,
+        confidence,
+        {
+            "tree_lines": tree_lines,
+            "path_lines": path_lines,
+            "config_files": config_files,
+            "package_roots": package_roots,
         },
     )
 

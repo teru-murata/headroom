@@ -1,0 +1,74 @@
+$ git diff -- crates/checkout/Cargo.toml crates/checkout/src/lib.rs crates/checkout/tests/session.rs Cargo.lock
+diff --git a/crates/checkout/Cargo.toml b/crates/checkout/Cargo.toml
+index f12abcd..a33f102 100644
+--- a/crates/checkout/Cargo.toml
++++ b/crates/checkout/Cargo.toml
+@@ -8,6 +8,7 @@ edition = "2021"
+ [dependencies]
+ serde = { version = "1", features = ["derive"] }
++uuid = { version = "1", features = ["v7"] }
+ thiserror = "1"
+diff --git a/crates/checkout/src/lib.rs b/crates/checkout/src/lib.rs
+index 1e5c9bd..88ad7ae 100644
+--- a/crates/checkout/src/lib.rs
++++ b/crates/checkout/src/lib.rs
+@@ -1,18 +1,23 @@
+ use serde::{Deserialize, Serialize};
++use uuid::Uuid;
+
+ const unchanged_rust_context_001: &str = "noise";
+ const unchanged_rust_context_002: &str = "noise";
+ const unchanged_rust_context_003: &str = "noise";
+ const unchanged_rust_context_004: &str = "noise";
+ const unchanged_rust_context_005: &str = "noise";
+ const unchanged_rust_context_006: &str = "noise";
+ const unchanged_rust_context_007: &str = "noise";
+ const unchanged_rust_context_008: &str = "noise";
+
+ pub struct CheckoutSession {
+     pub total_cents: i64,
++    pub request_id: Uuid,
+ }
+
++pub fn create_checkout_session(total_cents: i64) -> CheckoutSession {
++    CheckoutSession { total_cents, request_id: Uuid::now_v7() }
++}
+@@ -36,10 +41,12 @@ pub fn create_checkout_session(total_cents: i64) -> CheckoutSession {
+ const unchanged_rust_context_009: &str = "noise";
+ const unchanged_rust_context_010: &str = "noise";
+ const unchanged_rust_context_011: &str = "noise";
+ const unchanged_rust_context_012: &str = "noise";
+diff --git a/crates/checkout/tests/session.rs b/crates/checkout/tests/session.rs
+index 409fa21..dd015ea 100644
+--- a/crates/checkout/tests/session.rs
++++ b/crates/checkout/tests/session.rs
+@@ -1,7 +1,9 @@
+ use checkout::create_checkout_session;
+
+ #[test]
+-fn creates_checkout_session() {
++fn creates_checkout_session_request_id() {
+     let session = create_checkout_session(1500);
+     assert_eq!(session.total_cents, 1500);
++    assert!(!session.request_id.to_string().is_empty());
+ }
+diff --git a/Cargo.lock b/Cargo.lock
+index 9fb1c22..a2efc77 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -20,6 +20,18 @@ name = "checkout"
+ dependencies = [
+  "serde",
+  "thiserror",
++ "uuid",
+ ]
++[[package]]
++name = "uuid"
++version = "1.8.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "synthetic-checksum"
+@@ -200,15 +212,15 @@ synthetic_lock_noise_001 = "noise"
+ synthetic_lock_noise_002 = "noise"
+ synthetic_lock_noise_003 = "noise"
+ synthetic_lock_noise_004 = "noise"
+ synthetic_lock_noise_005 = "noise"

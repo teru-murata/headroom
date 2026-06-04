@@ -1,0 +1,66 @@
+$ git diff -- packages/billing/billing/discounts.py packages/billing/tests/test_discounts.py
+diff --git a/packages/billing/billing/discounts.py b/packages/billing/billing/discounts.py
+index 471cc22..a01bb45 100644
+--- a/packages/billing/billing/discounts.py
++++ b/packages/billing/billing/discounts.py
+@@ -1,18 +1,21 @@
+ from decimal import Decimal, ROUND_HALF_UP
+ from typing import Iterable
++from billing.audit import record_discount_decision
+ from billing.models import CartLine
+
+ unchanged_py_context_001 = "noise"
+ unchanged_py_context_002 = "noise"
+ unchanged_py_context_003 = "noise"
+ unchanged_py_context_004 = "noise"
+ unchanged_py_context_005 = "noise"
+ unchanged_py_context_006 = "noise"
+ unchanged_py_context_007 = "noise"
+ unchanged_py_context_008 = "noise"
+ unchanged_py_context_009 = "noise"
+ unchanged_py_context_010 = "noise"
+
+-def apply_discount(lines: Iterable[CartLine], percentage: Decimal) -> Decimal:
++def apply_discount(lines: Iterable[CartLine], percentage: Decimal, *, user_id: str) -> Decimal:
+     subtotal = sum((line.unit_price * line.quantity for line in lines), Decimal("0.00"))
+     discount = subtotal * percentage
+-    return discount.quantize(Decimal("0.01"))
++    rounded = discount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
++    record_discount_decision(user_id=user_id, discount=rounded)
++    return rounded
+@@ -44,20 +47,21 @@ def apply_discount(lines: Iterable[CartLine], percentage: Decimal, *, user_id: st
+ unchanged_py_context_011 = "noise"
+ unchanged_py_context_012 = "noise"
+ unchanged_py_context_013 = "noise"
+ unchanged_py_context_014 = "noise"
+ unchanged_py_context_015 = "noise"
+ unchanged_py_context_016 = "noise"
+ unchanged_py_context_017 = "noise"
+ unchanged_py_context_018 = "noise"
+ unchanged_py_context_019 = "noise"
+ unchanged_py_context_020 = "noise"
+ unchanged_py_context_021 = "noise"
+ unchanged_py_context_022 = "noise"
+ unchanged_py_context_023 = "noise"
+ unchanged_py_context_024 = "noise"
+diff --git a/packages/billing/tests/test_discounts.py b/packages/billing/tests/test_discounts.py
+index 0cffe12..44aacd2 100644
+--- a/packages/billing/tests/test_discounts.py
++++ b/packages/billing/tests/test_discounts.py
+@@ -1,12 +1,16 @@
+ from decimal import Decimal
++from unittest.mock import Mock
+
+ from billing.discounts import apply_discount
+ from tests.factories import cart_line
+
+ def test_apply_discount_rounds_half_up():
+     lines = [cart_line(unit_price=Decimal("19.99"), quantity=1)]
+-    assert apply_discount(lines, Decimal("0.50")) == Decimal("9.99")
++    assert apply_discount(lines, Decimal("0.50"), user_id="user_123") == Decimal("10.00")
+
++def test_apply_discount_records_audit_event(monkeypatch):
++    recorder = Mock()
++    monkeypatch.setattr("billing.discounts.record_discount_decision", recorder)
++    apply_discount([cart_line(unit_price=Decimal("10.00"), quantity=1)], Decimal("0.10"), user_id="user_123")
++    recorder.assert_called_once()

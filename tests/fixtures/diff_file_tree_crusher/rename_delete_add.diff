@@ -1,0 +1,35 @@
+$ git diff -- services/billing/old_policy.py services/billing/discount_policy.py services/billing/legacy.py services/billing/new_gateway.py
+diff --git a/services/billing/old_policy.py b/services/billing/discount_policy.py
+similarity index 87%
+rename from services/billing/old_policy.py
+rename to services/billing/discount_policy.py
+index 62dd1f0..a7c9921 100644
+--- a/services/billing/old_policy.py
++++ b/services/billing/discount_policy.py
+@@ -1,5 +1,7 @@
+-def legacy_discount_policy(account):
+-    return account.default_discount
++def discount_policy_for_account(account):
++    if account.is_enterprise:
++        return account.enterprise_discount
++    return account.default_discount
+diff --git a/services/billing/legacy.py b/services/billing/legacy.py
+deleted file mode 100644
+index b4100e1..0000000
+--- a/services/billing/legacy.py
++++ /dev/null
+@@ -1,5 +0,0 @@
+-def legacy_gateway_url():
+-    return "https://legacy.example.invalid"
+diff --git a/services/billing/new_gateway.py b/services/billing/new_gateway.py
+new file mode 100644
+index 0000000..dce1011
+--- /dev/null
++++ b/services/billing/new_gateway.py
+@@ -0,0 +1,7 @@
++def new_gateway_url() -> str:
++    return "https://gateway.example.invalid"
++
++class BillingGateway:
++    def authorize(self, amount_cents: int) -> bool:
++        return amount_cents > 0

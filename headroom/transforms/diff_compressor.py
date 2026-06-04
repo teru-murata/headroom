@@ -139,7 +139,7 @@ class DiffCompressor:
             return
         try:
             store: Any = get_compression_store()
-            store.store(original, compressed)
+            store.store(original, compressed, explicit_hash=cache_key)
         except Exception as e:
             logger.warning(
                 "CCR store write failed; cache_key %s remains in-marker only: %s",

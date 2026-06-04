@@ -4,6 +4,7 @@ from headroom.transforms.content_detector import (
     ContentType,
     _try_detect_code,
     _try_detect_diff,
+    _try_detect_file_tree,
     _try_detect_html,
     _try_detect_json,
     _try_detect_log,
@@ -118,6 +119,31 @@ def test_search_detection_uses_match_ratio() -> None:
 
     assert _try_detect_search("one:1:match\nplain\nplain\nplain") is None
     assert _try_detect_search("\n\n") is None
+
+
+def test_file_tree_detection_tracks_repo_shape() -> None:
+    tree = "\n".join(
+        [
+            ".",
+            "|-- package.json",
+            "|-- pyproject.toml",
+            "|-- src/",
+            "|   |-- server/",
+            "|   |   `-- auth.ts",
+            "|-- tests/",
+            "|   `-- test_auth.py",
+            "`-- node_modules/",
+            "    `-- package_001/",
+        ]
+    )
+    result = _try_detect_file_tree(tree)
+    assert result is not None
+    assert result.content_type is ContentType.FILE_TREE
+    assert result.metadata["tree_lines"] >= 8
+    assert result.metadata["config_files"] >= 2
+    assert detect_content_type(tree).content_type is ContentType.FILE_TREE
+
+    assert _try_detect_file_tree("plain\ntext\nonly") is None
 
 
 def test_log_detection_prefers_build_output_patterns() -> None:

@@ -1,0 +1,55 @@
+$ git diff -- src/server/auth.ts package-lock.json dist/client.min.js
+diff --git a/src/server/auth.ts b/src/server/auth.ts
+index ac22110..bb7231e 100644
+--- a/src/server/auth.ts
++++ b/src/server/auth.ts
+@@ -1,16 +1,19 @@
+ import { getSession } from "./session";
++import { auditAuthFailure } from "./audit";
+
+ export async function requireUser(userId: string) {
+   const session = await getSession(userId);
+   if (!session) {
++    auditAuthFailure(userId);
+     throw new Error("auth required");
+   }
+   return session.user;
+ }
+diff --git a/package-lock.json b/package-lock.json
+index 6620abc..984221d 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,40 +1,40 @@
+-lock_noise_001 old
++lock_noise_001 new
+-lock_noise_002 old
++lock_noise_002 new
+-lock_noise_003 old
++lock_noise_003 new
+-lock_noise_004 old
++lock_noise_004 new
+-lock_noise_005 old
++lock_noise_005 new
+-lock_noise_006 old
++lock_noise_006 new
+-lock_noise_007 old
++lock_noise_007 new
+-lock_noise_008 old
++lock_noise_008 new
+-lock_noise_009 old
++lock_noise_009 new
+-lock_noise_010 old
++lock_noise_010 new
+diff --git a/dist/client.min.js b/dist/client.min.js
+index ffeea10..88991ac 100644
+--- a/dist/client.min.js
++++ b/dist/client.min.js
+@@ -1,8 +1,8 @@
+-minified_generated_chunk_001_old
++minified_generated_chunk_001_new
+-minified_generated_chunk_002_old
++minified_generated_chunk_002_new
+-minified_generated_chunk_003_old
++minified_generated_chunk_003_new
+-minified_generated_chunk_004_old
++minified_generated_chunk_004_new

@@ -1,0 +1,57 @@
+$ git diff -- apps/web/src/components/CheckoutSummary.tsx apps/web/src/components/CheckoutSummary.test.tsx apps/web/.storybook/main.ts
+diff --git a/apps/web/src/components/CheckoutSummary.tsx b/apps/web/src/components/CheckoutSummary.tsx
+index 04111da..7a9fc21 100644
+--- a/apps/web/src/components/CheckoutSummary.tsx
++++ b/apps/web/src/components/CheckoutSummary.tsx
+@@ -1,16 +1,18 @@
+ import React from "react";
+ import { formatCurrency } from "../lib/money";
++import { useShippingEstimate } from "../hooks/useShippingEstimate";
+ import type { CartLine } from "../types/cart";
+
+ const boilerplate_ts_001 = "noise";
+ const boilerplate_ts_002 = "noise";
+ const boilerplate_ts_003 = "noise";
+ const boilerplate_ts_004 = "noise";
+ const boilerplate_ts_005 = "noise";
+ const boilerplate_ts_006 = "noise";
+ const boilerplate_ts_007 = "noise";
+ const boilerplate_ts_008 = "noise";
+
+-export function CheckoutSummary({ lines }: { lines: CartLine[] }) {
++export function CheckoutSummary({ lines, postalCode }: { lines: CartLine[]; postalCode: string }) {
++  const shipping = useShippingEstimate(postalCode);
+   const subtotal = lines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+   return (
+@@ -28,15 +30,17 @@ export function CheckoutSummary({ lines, postalCode }: { lines: CartLine[]; post
+       <span>{formatCurrency(subtotal)}</span>
++      <span>{formatCurrency(shipping.amount)}</span>
+     </section>
+   );
+ }
+diff --git a/apps/web/src/components/CheckoutSummary.test.tsx b/apps/web/src/components/CheckoutSummary.test.tsx
+index 70a44c8..96e73fb 100644
+--- a/apps/web/src/components/CheckoutSummary.test.tsx
++++ b/apps/web/src/components/CheckoutSummary.test.tsx
+@@ -1,8 +1,12 @@
+ import { render, screen } from "@testing-library/react";
+ import { CheckoutSummary } from "./CheckoutSummary";
+
+ it("renders subtotal and shipping estimate", () => {
+-  render(<CheckoutSummary lines={[{ price: 20, quantity: 2 }]} />);
++  render(<CheckoutSummary lines={[{ price: 20, quantity: 2 }]} postalCode="94107" />);
+   expect(screen.getByText("$40.00")).toBeInTheDocument();
++  expect(screen.getByText("$5.00")).toBeInTheDocument();
+ });
+diff --git a/apps/web/.storybook/main.ts b/apps/web/.storybook/main.ts
+index 88d1f51..e90c625 100644
+--- a/apps/web/.storybook/main.ts
++++ b/apps/web/.storybook/main.ts
+@@ -1,6 +1,7 @@
+ import type { StorybookConfig } from "@storybook/react-vite";
+
+ const config: StorybookConfig = {
++  staticDirs: ["../public"],
+   stories: ["../src/**/*.stories.@(ts|tsx)"],
+   addons: ["@storybook/addon-essentials"],
+ };

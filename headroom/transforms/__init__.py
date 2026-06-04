@@ -43,6 +43,11 @@ if TYPE_CHECKING:
         DiffCompressor,
         DiffCompressorConfig,
     )
+    from headroom.transforms.file_tree_compressor import (  # noqa: F401
+        FileTreeCompressionResult,
+        FileTreeCompressor,
+        FileTreeCompressorConfig,
+    )
     from headroom.transforms.html_extractor import (  # noqa: F401
         HTMLExtractionResult,
         HTMLExtractor,
@@ -91,6 +96,9 @@ __all__ = [
     "DiffCompressor",
     "DiffCompressorConfig",
     "DiffCompressionResult",
+    "FileTreeCompressor",
+    "FileTreeCompressorConfig",
+    "FileTreeCompressionResult",
     # Code-aware compression (AST-based)
     "CodeAwareCompressor",
     "CodeCompressorConfig",
@@ -159,6 +167,18 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "DiffCompressionResult": (
         "headroom.transforms.diff_compressor",
         "DiffCompressionResult",
+    ),
+    "FileTreeCompressor": (
+        "headroom.transforms.file_tree_compressor",
+        "FileTreeCompressor",
+    ),
+    "FileTreeCompressorConfig": (
+        "headroom.transforms.file_tree_compressor",
+        "FileTreeCompressorConfig",
+    ),
+    "FileTreeCompressionResult": (
+        "headroom.transforms.file_tree_compressor",
+        "FileTreeCompressionResult",
     ),
     # Code-aware compression (AST-based)
     "CodeAwareCompressor": ("headroom.transforms.code_compressor", "CodeAwareCompressor"),

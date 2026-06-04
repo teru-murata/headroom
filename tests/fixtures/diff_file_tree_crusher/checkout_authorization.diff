@@ -1,0 +1,124 @@
+﻿$ git diff -- src/checkout/session.ts tests/checkout/session.test.ts crates/headroom-core/src/auth.rs
+diff --git a/src/checkout/session.ts b/src/checkout/session.ts
+index 6e2a22b..a16f6ce 100644
+--- a/src/checkout/session.ts
++++ b/src/checkout/session.ts
+@@ -1,18 +1,20 @@
+ import { calculateCartTotal } from "./cart";
+ import { createPaymentIntent } from "./payments";
++import { requireUser } from "../auth/session";
+ import type { Cart, CheckoutSession } from "./types";
+
+ const CHECKOUT_VERSION = "2026-06";
+ const unchanged_checkout_context_001 = "noise";
+ const unchanged_checkout_context_002 = "noise";
+ const unchanged_checkout_context_003 = "noise";
+ const unchanged_checkout_context_004 = "noise";
+ const unchanged_checkout_context_005 = "noise";
+ const unchanged_checkout_context_006 = "noise";
+ const unchanged_checkout_context_007 = "noise";
+ const unchanged_checkout_context_008 = "noise";
+ const unchanged_checkout_context_009 = "noise";
+ const unchanged_checkout_context_010 = "noise";
+
+-export async function createCheckoutSession(cart: Cart): Promise<CheckoutSession> {
++export async function createCheckoutSession(userId: string, cart: Cart): Promise<CheckoutSession> {
++  const user = await requireUser(userId);
+   const total = calculateCartTotal(cart);
+   const paymentIntent = await createPaymentIntent(total);
+   return {
+@@ -42,22 +44,25 @@ export async function createCheckoutSession(userId: string, cart: Cart): Promise
+     version: CHECKOUT_VERSION,
+     paymentIntentId: paymentIntent.id,
++    userId: user.id,
+   };
+ }
+
+ const unchanged_checkout_context_011 = "noise";
+ const unchanged_checkout_context_012 = "noise";
+ const unchanged_checkout_context_013 = "noise";
+ const unchanged_checkout_context_014 = "noise";
+ const unchanged_checkout_context_015 = "noise";
+ const unchanged_checkout_context_016 = "noise";
+ const unchanged_checkout_context_017 = "noise";
+ const unchanged_checkout_context_018 = "noise";
+ const unchanged_checkout_context_019 = "noise";
+ const unchanged_checkout_context_020 = "noise";
+ const unchanged_checkout_context_021 = "noise";
+ const unchanged_checkout_context_022 = "noise";
+ const unchanged_checkout_context_023 = "noise";
+ const unchanged_checkout_context_024 = "noise";
+
++export function buildCheckoutAuditEvent(session: CheckoutSession): string {
++  return `checkout.session.created:${session.userId}:${session.paymentIntentId}`;
++}
+diff --git a/tests/checkout/session.test.ts b/tests/checkout/session.test.ts
+index 3b891fa..7b1fa62 100644
+--- a/tests/checkout/session.test.ts
++++ b/tests/checkout/session.test.ts
+@@ -1,19 +1,25 @@
+ import { describe, expect, it, vi } from "vitest";
+ import { createCheckoutSession } from "../../src/checkout/session";
+ import { buildCart } from "../fixtures/cart";
+
+ const unchanged_test_context_001 = "noise";
+ const unchanged_test_context_002 = "noise";
+ const unchanged_test_context_003 = "noise";
+ const unchanged_test_context_004 = "noise";
+ const unchanged_test_context_005 = "noise";
+ const unchanged_test_context_006 = "noise";
+ const unchanged_test_context_007 = "noise";
+ const unchanged_test_context_008 = "noise";
+ const unchanged_test_context_009 = "noise";
+ const unchanged_test_context_010 = "noise";
+
+ describe("createCheckoutSession", () => {
+-  it("creates a payment intent", async () => {
++  it("creates a payment intent for an authenticated user", async () => {
+     const cart = buildCart();
+-    const session = await createCheckoutSession(cart);
++    const session = await createCheckoutSession("user_123", cart);
+     expect(session.paymentIntentId).toMatch(/^pi_/);
++    expect(session.userId).toBe("user_123");
+   });
++
++  it("rejects anonymous checkout requests", async () => {
++    await expect(createCheckoutSession("", buildCart())).rejects.toThrow("auth required");
++  });
+ });
+diff --git a/crates/headroom-core/src/auth.rs b/crates/headroom-core/src/auth.rs
+new file mode 100644
+index 0000000..4ce62fa
+--- /dev/null
++++ b/crates/headroom-core/src/auth.rs
+@@ -0,0 +1,28 @@
++use crate::errors::AuthError;
++use crate::session::Session;
++
++pub fn require_user_session(session: &Session) -> Result<&str, AuthError> {
++    let user_id = session.user_id.as_deref().ok_or(AuthError::MissingUser)?;
++    if user_id.is_empty() {
++        return Err(AuthError::MissingUser);
++    }
++    Ok(user_id)
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn rejects_missing_user_session() {
++        let session = Session { user_id: None };
++        assert!(matches!(
++            require_user_session(&session),
++            Err(AuthError::MissingUser)
++        ));
++    }
++
++    #[test]
++    fn accepts_authenticated_user_session() {
++        let session = Session { user_id: Some("user_123".to_string()) };
++        assert_eq!(require_user_session(&session).unwrap(), "user_123");
++    }
++}

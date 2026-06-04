@@ -121,6 +121,13 @@ def _detect_content(content: str) -> DetectionResult:
     only consumed `.content_type` from it; the strategy mapping in
     `_strategy_from_detection` keys off that field alone.
     """
+    regex_result = _regex_detect_content_type(content)
+    if regex_result.content_type in {
+        ContentType.FILE_TREE,
+        ContentType.SOURCE_CODE,
+    }:
+        return regex_result
+
     from headroom._core import detect_content_type as _rust_detect
 
     rust_result = _rust_detect(content)
@@ -129,7 +136,6 @@ def _detect_content(content: str) -> DetectionResult:
     # downstream mapping keys match.
     content_type = ContentType(rust_result.content_type)
     if content_type is ContentType.PLAIN_TEXT:
-        regex_result = _regex_detect_content_type(content)
         if regex_result.content_type is not ContentType.PLAIN_TEXT:
             return regex_result
     return DetectionResult(
@@ -304,6 +310,7 @@ class CompressionStrategy(Enum):
     KOMPRESS = "kompress"
     TEXT = "text"
     DIFF = "diff"
+    FILE_TREE = "file_tree"
     HTML = "html"
     MIXED = "mixed"
     PASSTHROUGH = "passthrough"
@@ -441,6 +448,7 @@ class ContentRouterConfig:
     enable_smart_crusher: bool = True
     enable_search_compressor: bool = True
     enable_log_compressor: bool = True
+    enable_file_tree_compressor: bool = True
     enable_html_extractor: bool = True  # HTML content extraction
     enable_image_optimizer: bool = True  # Image token optimization
 
@@ -737,6 +745,7 @@ class ContentRouter(Transform):
         self._search_compressor: Any = None
         self._log_compressor: Any = None
         self._diff_compressor: Any = None
+        self._file_tree_compressor: Any = None
         self._html_extractor: Any = None
         self._kompress: Any = None
 
@@ -1005,6 +1014,7 @@ class ContentRouter(Transform):
             ContentType.SEARCH_RESULTS: CompressionStrategy.SEARCH,
             ContentType.BUILD_OUTPUT: CompressionStrategy.LOG,
             ContentType.GIT_DIFF: CompressionStrategy.DIFF,
+            ContentType.FILE_TREE: CompressionStrategy.FILE_TREE,
             ContentType.HTML: CompressionStrategy.HTML,
             ContentType.PLAIN_TEXT: CompressionStrategy.TEXT,
         }
@@ -1261,6 +1271,18 @@ class ContentRouter(Transform):
                     )
                     decision_reason = "diff_compressor"
 
+            elif strategy == CompressionStrategy.FILE_TREE:
+                if self.config.enable_file_tree_compressor:
+                    compressor = self._get_file_tree_compressor()
+                    if compressor:
+                        compressor_name = type(compressor).__name__
+                        result = compressor.compress(content, context=context)
+                        compressed, compressed_tokens = (
+                            result.compressed,
+                            len(result.compressed.split()),
+                        )
+                        decision_reason = "file_tree_compressor"
+
             elif strategy == CompressionStrategy.HTML:
                 if self.config.enable_html_extractor:
                     extractor = self._get_html_extractor()
@@ -1472,6 +1494,7 @@ class ContentRouter(Transform):
             ContentType.SEARCH_RESULTS: CompressionStrategy.SEARCH,
             ContentType.BUILD_OUTPUT: CompressionStrategy.LOG,
             ContentType.GIT_DIFF: CompressionStrategy.DIFF,
+            ContentType.FILE_TREE: CompressionStrategy.FILE_TREE,
             ContentType.HTML: CompressionStrategy.HTML,
             ContentType.PLAIN_TEXT: CompressionStrategy.TEXT,
         }
@@ -1485,6 +1508,7 @@ class ContentRouter(Transform):
             CompressionStrategy.SEARCH: ContentType.SEARCH_RESULTS,
             CompressionStrategy.LOG: ContentType.BUILD_OUTPUT,
             CompressionStrategy.DIFF: ContentType.GIT_DIFF,
+            CompressionStrategy.FILE_TREE: ContentType.FILE_TREE,
             CompressionStrategy.HTML: ContentType.HTML,
             CompressionStrategy.TEXT: ContentType.PLAIN_TEXT,
             CompressionStrategy.KOMPRESS: ContentType.PLAIN_TEXT,
@@ -1556,6 +1580,14 @@ class ContentRouter(Transform):
 
             self._diff_compressor = DiffCompressor()
         return self._diff_compressor
+
+    def _get_file_tree_compressor(self) -> Any:
+        """Get FileTreeCompressor (lazy load)."""
+        if self._file_tree_compressor is None:
+            from .file_tree_compressor import FileTreeCompressor
+
+            self._file_tree_compressor = FileTreeCompressor()
+        return self._file_tree_compressor
 
     def _get_html_extractor(self) -> Any:
         """Get HTMLExtractor (lazy load)."""
