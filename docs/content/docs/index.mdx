@@ -78,12 +78,14 @@ Headroom works as a **transparent proxy** (zero code changes), a **Python functi
 
 87.6% fewer tokens. Same answer. The FATAL error was automatically preserved -- not by keyword matching, but by statistical analysis of field variance.
 
-| Scenario | Before | After | Savings |
-|---|---|---|---|
-| Code search (100 results) | 17,765 | 1,408 | **92%** |
-| SRE incident debugging | 65,694 | 5,118 | **92%** |
-| Codebase exploration | 78,502 | 41,254 | **47%** |
-| GitHub issue triage | 54,174 | 14,761 | **73%** |
+Local benchmark and acceptance evidence now lives in:
+
+- [Context Waste Benchmark](/docs/context-waste-benchmark)
+- [Cache-Aware Net Savings](/docs/cache-aware-net-savings)
+- [Acceptance Evidence](/docs/acceptance-evidence)
+
+These reports are local/offline and workload-dependent. They are not exact
+provider billing reports or guaranteed savings claims.
 
 ## Key Features
 
@@ -93,9 +95,12 @@ Headroom works as a **transparent proxy** (zero code changes), a **Python functi
 
 <FrameworkIntegrations />
 
-## Nothing is lost
+## Local retrieval
 
-Compressed content goes into the CCR store (Compress-Cache-Retrieve). The LLM gets a `headroom_retrieve` tool and can fetch full originals when it needs more detail. Compression is aggressive but reversible.
+Eligible omitted content goes into the CCR store (Compress-Cache-Retrieve). The
+LLM gets a `headroom_retrieve` tool and can fetch full originals while the local
+store entry remains available. Retrieval depends on marker validation, backend
+retention, and local safety policy.
 
 ## Next steps
 

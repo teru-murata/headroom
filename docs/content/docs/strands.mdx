@@ -70,7 +70,10 @@ The hook preserves error items, anomalous values (statistical outliers), items m
 
 ## Both together
 
-Model wrapping compresses conversation history. Hooks compress individual tool results. Use both for maximum savings:
+Model wrapping routes eligible messages through the Headroom pipeline. Hooks
+compress individual tool results. Stable conversation and provider-prefix
+content should remain protected unless the selected mode or a future explicit
+feature changes that policy:
 
 ```python
 from headroom.integrations.strands import HeadroomStrandsModel, HeadroomHookProvider
@@ -98,13 +101,15 @@ Agent builds next API request
     |
     v
 HeadroomStrandsModel.stream()
-    compresses full message list
+    routes eligible messages through Headroom
     |
     v
 Provider API (Bedrock, etc.)
 ```
 
-The model wrapper uses the full Headroom pipeline (CacheAligner, ContentRouter, IntelligentContext). The hook provider uses SmartCrusher directly for fast JSON compression.
+The model wrapper uses the full Headroom pipeline (CacheAligner, ContentRouter,
+IntelligentContext). The hook provider uses SmartCrusher directly for fast JSON
+compression of tool results.
 
 ## Structured output
 

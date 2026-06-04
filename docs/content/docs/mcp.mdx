@@ -171,7 +171,9 @@ The LLM calls `headroom_compress` on demand. Compression happens locally in the 
 
 ### MCP + Proxy (full setup)
 
-The proxy compresses all traffic at the HTTP level (before the LLM sees content). MCP tools operate after the LLM receives content. They handle different data and do not double-compress.
+The proxy routes eligible HTTP request content through local compression before
+the provider sees it. MCP tools operate after the LLM receives content. They
+handle different data and do not double-compress.
 
 `headroom_retrieve` checks the local store first, then falls back to the proxy's store.
 

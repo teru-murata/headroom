@@ -33,6 +33,10 @@ Event names use the `bridge.*` namespace, for example
 `bridge.compression.completed`, `bridge.compression.bypassed`, and
 `bridge.ccr.retrieved`.
 
+JSONL export is a local producer path. If the local ledger writer cannot append
+an event, compression should continue by default; ledger write failures are not
+treated as hosted ingest, billing, or retention failures inside Headroom.
+
 ## Source Fields
 
 Compression events include source-level fields such as:
@@ -73,6 +77,6 @@ bridge.source_type
 bridge.accuracy_guard
 ```
 
-Hosted ingest, retention, reconciliation, billing, dashboards, and long-term
-analytics belong to coding-agent-bridge. Headroom only emits local
+Hosted ingest, retention, reconciliation, billing, dashboards, ROI reporting,
+and long-term analytics belong to coding-agent-bridge. Headroom only emits local
 ledger-compatible producer events.

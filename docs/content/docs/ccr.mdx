@@ -63,6 +63,12 @@ and generic compression summaries. The `<<ccr:...>>` form is used by
 SmartCrusher row-drop and opaque-blob paths. Both marker families normalize to a
 local hash before store lookup or retrieve-tool parsing.
 
+Proxy retrieve handlers use the same local normalization path for a raw hash,
+an existing bracket retrieve marker, or a SmartCrusher `<<ccr:...>>` marker.
+Malformed markers and hashes are rejected instead of being used for store
+lookup. A well-formed but missing local hash returns controlled not-found
+behavior, such as `404` on the local HTTP retrieve path.
+
 The local hash grammar is explicit:
 
 | Hash form | Local producer |

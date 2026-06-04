@@ -6,6 +6,8 @@ description: Local model for deciding when compression should preserve provider 
 Headroom should optimize estimated net savings, not only raw input token
 reduction. Rewriting a stable provider-cache prefix can be harmful when the
 lost cache value is larger than the tokens saved by compression.
+Raw token reduction can therefore be misleading when it destroys cacheability or
+causes later CCR retrieval cost.
 
 ## Local Decision Model
 

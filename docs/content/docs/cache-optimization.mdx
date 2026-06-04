@@ -1,36 +1,51 @@
 ---
 title: Cache Optimization
-description: Stabilize message prefixes for provider KV cache hits and configure provider-specific caching strategies.
+description: Detect provider-cache risk and use local decision support before compressing cache-sensitive content.
 ---
 
-LLM providers cache prompt prefixes to avoid reprocessing identical input on repeated calls. Headroom's **CacheAligner** stabilizes your message prefixes so these caches actually hit, and then applies provider-specific strategies to maximize savings.
+LLM providers cache prompt prefixes to avoid reprocessing identical input on
+repeated calls. Headroom treats provider cacheability as a constraint: stable
+prefix and protected-prefix content should be preserved unless an explicit
+future feature changes that policy.
+
+The current local path is conservative. CacheAligner detects volatile prefix
+content and reports cache-stability metrics; the cache-aware net-savings model
+estimates whether compression should be skipped when cache miss penalty or CCR
+retrieve cost outweighs raw token reduction.
 
 ## How CacheAligner works
 
-System prompts often contain dynamic content -- today's date, session IDs, timestamps -- that changes between requests. Even a single character difference at the start of a prompt invalidates the entire provider cache.
+System prompts often contain dynamic content -- today's date, session IDs, timestamps -- that changes between requests. Even a single character difference at the start of a prompt can invalidate a provider prefix cache.
 
-CacheAligner solves this by extracting dynamic content and moving it to the end of the message, keeping the prefix stable:
+The detector identifies these risks so callers can protect stable prefixes or
+make an explicit cache-aware decision. True transport-level delta mode or
+automatic prefix rewriting remains future work.
 
 ```
 Before:
   "You are helpful. Current Date: 2025-04-06"  <- changes daily, no cache hit
 
-After:
+Potential policy outcome:
   "You are helpful."                            <- stable prefix, cache hit
-  "[Context: Current Date: 2025-04-06]"         <- dynamic part moved to tail
+  "[Context: Current Date: 2025-04-06]"         <- dynamic part handled outside the protected prefix
 ```
 
-The prefix stays byte-identical across requests, so the provider's KV cache can reuse previously computed attention states.
+The example above illustrates a cache-stability goal, not a guarantee that the
+current Headroom pipeline rewrites every prompt prefix.
 
 ## Provider-specific strategies
 
-Each LLM provider implements caching differently. Headroom applies the optimal strategy for each.
+Each LLM provider implements caching differently. Headroom tracks these
+differences as local configuration and benchmark inputs; it does not guarantee
+provider cache hits or exact billing outcomes.
 
 ### Anthropic
 
 Anthropic supports explicit `cache_control` blocks that mark content as cacheable. Cached input tokens cost **90% less** than regular input tokens.
 
-Headroom automatically inserts `cache_control` breakpoints at the right positions in your messages so that stable prefixes (system prompts, early conversation turns) are cached across requests.
+Provider integrations can use explicit `cache_control` breakpoints where the
+caller enables that behavior. Keep stable prefixes intact when cacheability
+matters.
 
 | Metric | Value |
 |---|---|
@@ -42,7 +57,9 @@ Headroom automatically inserts `cache_control` breakpoints at the right position
 
 OpenAI uses automatic **prefix caching** -- if consecutive requests share the same message prefix, the provider reuses cached KV states. No explicit API markers are needed, but the prefix must be byte-identical.
 
-CacheAligner ensures your prefixes remain stable by extracting dynamic content, which is the key requirement for OpenAI prefix caching to work.
+OpenAI prefix caching depends on byte-identical prefixes. Headroom's local
+cache-aware policy should avoid rewriting protected prefixes that may already be
+cacheable.
 
 | Metric | Value |
 |---|---|
@@ -54,7 +71,9 @@ CacheAligner ensures your prefixes remain stable by extracting dynamic content, 
 
 Google provides the **CachedContent API**, which lets you explicitly cache large context (system instructions, documents, tools) and reference it across requests. Cached tokens cost **75% less**.
 
-Headroom can manage CachedContent lifecycle automatically, creating and refreshing cached content objects as needed.
+Provider-side cached-content lifecycle is provider-specific and should be
+configured explicitly. Hosted pricing catalogs and ROI reporting belong to
+coding-agent-bridge, not this local Headroom repository.
 
 | Metric | Value |
 |---|---|
@@ -74,7 +93,7 @@ import type {
   HeadroomConfig,
 } from "headroom-ai";
 
-// CacheAligner: stabilize prefixes for cache hits
+// CacheAligner: detect volatile prefix content and cache-risk patterns
 const cacheAligner: CacheAlignerConfig = {
   enabled: true,
   datePatterns: [
@@ -98,7 +117,7 @@ const config: HeadroomConfig = {
   cacheOptimizer,
 };
 
-// Compress with cache optimization
+// Compress with cache-aware local policy
 const result = await compress(messages, {
   model: "claude-sonnet-4-20250514",
   config,
@@ -148,16 +167,13 @@ client = HeadroomClient(
 </Tab>
 </Tabs>
 
-## How savings compound
+## How estimates compound
 
-CacheAligner and provider caching work together with Headroom's compression transforms:
+Cache-aware policy and provider caching interact with Headroom's compression transforms:
 
-1. **SmartCrusher** reduces token count by 70-90%
-2. **CacheAligner** stabilizes prefixes so provider caches hit
-3. **Provider caching** discounts the remaining input tokens by 50-90%
+1. **Compression transforms** may reduce eligible noisy context.
+2. **Cache-aware policy** should protect stable provider prefixes.
+3. **Provider caching** may discount cacheable input when the provider accepts it.
+4. **CCR retrieval** can add estimated follow-up cost if omitted content is later retrieved.
 
-For example, with Anthropic:
-- 100K input tokens compressed to 20K (80% savings from SmartCrusher)
-- 18K of those 20K hit the cache (90% cache read discount)
-- Effective cost: 2K full-price tokens + 18K at 10% = 3.8K equivalent tokens
-- **Total savings: 96.2%** compared to the original 100K tokens
+For local decision support, see [Cache-Aware Net Savings](/docs/cache-aware-net-savings). It models gross saved tokens, cache miss penalty, CCR retrieve cost, and net saved tokens. The result is not exact provider billing and not an invoice denominator.

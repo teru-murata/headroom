@@ -1,0 +1,82 @@
+task: M001 post-H001-H009 README/docs/issues maintenance sweep
+date: 2026-06-05
+scope: docs/metadata/issue-maintenance only
+
+Why this sweep exists:
+- H001-H009 added local CCR marker parsing, proxy retrieve consistency, SQLite
+  local backend, coding-agent acceptance fixtures, source-specific presets,
+  local provenance ledger events, context waste benchmark, and cache-aware
+  net-savings decision support.
+- README/docs still had older headline claims, broader compression language,
+  and incomplete issue-status/validation-log discoverability.
+
+README changes:
+- added "Current shipped capabilities" for H001-H009
+- documented local-first coding-agent surrounding context scope
+- stated source code is not blindly compressed
+- added boundary note for coding-agent-bridge ownership
+- replaced old saved-token/headline Proof section with local benchmark and validation
+  evidence links
+- updated CCR, SQLite, provenance ledger, and cache-aware decision-support
+  language
+
+Docs changes:
+- CCR docs now state shared marker parser/validation, raw hash / bracket marker
+  / <<ccr:...>> normalization, malformed rejection, controlled not_found, and
+  SQLite local/single-host backend boundary
+- text/log docs now spell out CodingAgentPreset source-specific preservation
+  contracts
+- telemetry docs now state local JSONL export, bridge.* attributes, local
+  defaults, estimated token counts, and non-fatal local write failures
+- benchmark docs now state local/offline/no-remote-provider caveats and
+  net-savings decision-support boundaries
+- cache optimization, proxy, architecture, index, and Strands docs were adjusted
+  away from "compress everything", guaranteed savings, and conversation-history
+  compaction implications
+- added roadmap-boundaries docs page
+- added validation log index
+- added issue-status maintenance note
+
+Claim audit changes:
+- removed README badge and community leaderboard links that implied current
+  fork guarantees
+- removed old README benchmark table as a headline proof claim
+- replaced guaranteed/absolute wording with workload-dependent,
+  fixture-estimated, local/offline, and decision-support wording
+- kept hosted SaaS, tenant auth, billing, dashboard, deployment, Redis/Valkey,
+  conformance, and remote retrieve authorization outside Headroom scope
+
+Issue status recommendations:
+- do not close issues automatically in M001
+- #4 and #13 are close-ready if accepted as Headroom-local CCR marker/retrieve
+  scope
+- #8 local SQLite portion is complete; leave open or split if Redis/Valkey
+  hosted/shared wording remains
+- #9, #14, #15, #16, and #17 are already closed
+- #5, #6, #7, #10, #12, #18, #19, #20, #21, and #22 remain open by design
+  unless bridge/core ownership is changed explicitly
+
+Validation:
+- tests/test_coding_agent_presets.py: 12 passed
+- tests/test_provenance_ledger_emitter.py: 12 passed
+- tests/test_context_waste_benchmark.py: 14 passed
+- tests/test_cache_aware_net_savings.py: 12 passed
+- tests/test_log_crusher_acceptance.py: 8 passed
+- tests/test_diff_file_tree_crusher_acceptance.py: 14 passed
+- tests/test_ccr_tool_injection.py: 57 passed
+- tests/test_proxy_ccr.py: 30 passed
+- python -m ruff check headroom tests: passed
+- python -m ruff format --check headroom tests: passed
+- git diff --check: passed; CRLF replacement warnings only
+- npm exec fumadocs-mdx from repo root: failed because the root has no
+  package.json and the npx temp install could not resolve vite
+- npm exec fumadocs-mdx from docs/: passed
+
+Full pytest:
+- not run for this task
+
+Implementation behavior:
+- no compression, CCR, backend, proxy, preset, benchmark, or telemetry runtime
+  behavior was changed
+- only README/docs/maintenance/validation files and docs-site metadata copy were
+  changed

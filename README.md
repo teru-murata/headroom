@@ -11,7 +11,6 @@
   <a href="https://pypi.org/project/headroom-ai/"><img src="https://img.shields.io/pypi/v/headroom-ai.svg" alt="PyPI"></a>
   <a href="https://www.npmjs.com/package/headroom-ai"><img src="https://img.shields.io/npm/v/headroom-ai.svg" alt="npm"></a>
   <a href="https://huggingface.co/chopratejas/kompress-base"><img src="https://img.shields.io/badge/model-Kompress--base-yellow.svg" alt="Model: Kompress-base"></a>
-  <a href="https://headroomlabs.ai/dashboard"><img src="https://img.shields.io/badge/tokens%20saved-60B%2B-2ea44f" alt="Tokens saved: 60B+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <a href="https://headroom-docs.vercel.app/docs"><img src="https://img.shields.io/badge/docs-online-blue.svg" alt="Docs"></a>
 </p>
@@ -56,6 +55,25 @@ Fork-specific roadmap and claim tracking live in [Issues](https://github.com/ter
   <br/><sub>Live: 10,144 → 1,260 tokens — same FATAL found.</sub>
 </p>
 
+## Current shipped capabilities
+
+Headroom optimizes coding-agent surrounding context such as logs, diffs, file trees, search results, package metadata, MCP/tool outputs, and other noisy tool context. It deliberately protects stable conversation and provider-prefix content unless an explicit future feature says otherwise.
+
+Shipped in this fork after H001-H009:
+
+- local-first compression for coding-agent surrounding context, focused on high-noise tool and workflow output;
+- evidence-preserving log compression for test/build failures, including commands, exit codes, failed tests, diagnostics, traceback evidence, and file/line references;
+- diff and file-tree acceptance coverage for file paths, status, hunk headers, changed symbols, nearby imports, test impact hints, package roots, source/test shape, and config/build files;
+- `CodingAgentPreset` source routing for logs, diffs, file trees, search results, package metadata, MCP/tool responses, and generic noisy output while preserving source code by default;
+- shared CCR marker parsing for existing bracket retrieve markers and SmartCrusher `<<ccr:...>>` markers;
+- local CCR retrieve flow through the compression store, with malformed markers rejected and valid missing markers returning controlled not-found behavior;
+- in-memory CCR by default plus a first-party local SQLite CCR backend for single-host restart survival, TTL, cleanup, and same-file multi-instance access;
+- local provenance ledger events, local JSONL export, and OpenTelemetry-compatible `bridge.*` attribute names;
+- a local/offline context waste benchmark suite; and
+- a cache-aware net-savings benchmark and decision model for compress-vs-skip evaluation.
+
+Headroom remains the compression/local-runtime/core repository. Hosted/team bridge operation, tenant auth, SaaS control plane, billing, dashboards, deployment profiles, and conformance authority live in `mishima-computing/coding-agent-bridge`. Shared schemas and markers are versioned public contracts.
+
 ## Positioning
 
 Headroom is not trying to win on compression ratio alone. Sandbox-style tools keep raw output out of context; prompt compressors shorten natural-language prompts; observability tools count request-level spend. Headroom's fork direction is different: make noisy coding-agent context reversible, cache-aware, and attributable at the source level.
@@ -84,9 +102,14 @@ The current README is intentionally split between shipped behavior and roadmap i
 | Local proxy | Shipped | `headroom proxy --port 8787`; local developer mode is the default. |
 | Agent wrap | Shipped / integration-specific | `headroom wrap claude|codex|cursor|aider|copilot`; provider behavior varies. |
 | MCP server | Shipped | `headroom_compress`, `headroom_retrieve`, `headroom_stats`. |
-| Structured/tool-output compression | Shipped / under audit | Best fit: logs, JSON, RAG chunks, file reads, search results, tool outputs. |
-| CacheAligner | Shipped as detector-only | Detects volatile prefix content and reports cache-stability metrics; it does not rewrite prompts. |
-| CCR retrieval | Experimental | Originals are cached locally and retrievable while the cache entry is available. Durable guarantees are tracked below. |
+| Coding-agent context compression | Shipped local | Best fit: logs, diffs, file trees, search results, package metadata, MCP/tool outputs, JSON, RAG chunks, and other noisy surrounding context. Source code is not blindly compressed. |
+| Evidence-preserving log/diff/tree handling | Shipped local | Acceptance fixtures cover failed test/build logs, diffs, file trees, and local CCR retrievability for omitted content. |
+| CodingAgentPreset | Shipped local | Routes source categories to deterministic local compressors and preserves source code by default. |
+| Cache-aware decision support | Shipped local benchmark/model | H009 models cache miss penalty, CCR retrieve cost, and compress-vs-skip decisions. It is not invoice accounting. |
+| CCR marker parsing and retrieval | Shipped local | Bracket retrieve markers and SmartCrusher `<<ccr:...>>` markers share parser/validation and local retrieve behavior. |
+| CCR backend | Shipped local | In-memory remains the default volatile backend. `HEADROOM_CCR_BACKEND=sqlite` enables local single-host restart survival, TTL, cleanup, and same-file multi-instance access. |
+| Provenance ledger | Shipped local producer | Emits local ledger events, JSONL export, and `bridge.*` OpenTelemetry-compatible attribute names. Hosted ingest remains bridge scope. |
+| Hosted/team bridge operation | Not shipped here | Tenant auth, remote retrieve policy, SaaS control plane, billing, dashboards, deployment profiles, Redis/Valkey hosted profile, and conformance authority belong to `mishima-computing/coding-agent-bridge`. |
 
 ## Roadmap and tracking
 
@@ -108,11 +131,11 @@ The current README is intentionally split between shipped behavior and roadmap i
 | Claim | Current status | Limitation | Tracking |
 |---|---|---|---|
 | Compresses noisy tool/context outputs | Shipped / under audit | Coverage depends on provider and integration path. | [#11](https://github.com/teru-murata/headroom/issues/11), [#14](https://github.com/teru-murata/headroom/issues/14) |
-| CCR makes compression reversible | Experimental | Default storage is in-memory with TTL; `HEADROOM_CCR_BACKEND=sqlite` adds local single-host restart survival. | [#8](https://github.com/teru-murata/headroom/issues/8), [#13](https://github.com/teru-murata/headroom/issues/13) |
-| CacheAligner improves provider cache hits | Under audit | Current implementation is detector-only; net cache savings need measurement. | [#2](https://github.com/teru-murata/headroom/issues/2), [#6](https://github.com/teru-murata/headroom/issues/6), [#15](https://github.com/teru-murata/headroom/issues/15) |
+| CCR makes compression retrievable | Shipped local | Retrieval depends on the active store, TTL, marker validation, and local safety guard. In-memory is volatile; SQLite is local single-host durable. | [#8](https://github.com/teru-murata/headroom/issues/8), [#13](https://github.com/teru-murata/headroom/issues/13) |
+| Cache-aware decisions can protect provider cacheability | Shipped local benchmark/model | Current net-savings model is decision support. True cache-aware alignment/delta mode remains roadmap. | [#2](https://github.com/teru-murata/headroom/issues/2), [#6](https://github.com/teru-murata/headroom/issues/6), [#15](https://github.com/teru-murata/headroom/issues/15) |
 | Conversation history is compressed | Roadmap | Codex/OpenAI Responses protects user/system/assistant prefix content by design. | [#7](https://github.com/teru-murata/headroom/issues/7) |
 | Remote/shared proxy mode | Roadmap / safety work | Local mode is shipped; shared remote mode needs auth, namespace, and retrieve policy. | [#10](https://github.com/teru-murata/headroom/issues/10), [#18](https://github.com/teru-murata/headroom/issues/18) |
-| 60–95% fewer tokens | Benchmark claim | Keep headline numbers tied to reproducible traces, task accuracy, cache impact, and retrieve rate. | [#11](https://github.com/teru-murata/headroom/issues/11), [#14](https://github.com/teru-murata/headroom/issues/14) |
+| Large token reductions | Workload-dependent benchmark result | Use local/offline fixtures and validation logs. Do not treat headline percentages as guaranteed savings, exact provider billing reduction, or task-accuracy proof. | [#11](https://github.com/teru-murata/headroom/issues/11), [#14](https://github.com/teru-murata/headroom/issues/14) |
 
 ## How it works (30 seconds)
 
@@ -163,34 +186,17 @@ headroom stats
 
 Granular extras: `[proxy]`, `[mcp]`, `[ml]`, `[agno]`, `[langchain]`, `[evals]`. Requires **Python 3.10+**.
 
-## Proof
+## Benchmark and validation evidence
 
-**Savings on real agent workloads:**
+Current fork claims should be read through local validation and benchmark artifacts:
 
-| Workload                      | Before | After  | Savings |
-|-------------------------------|-------:|-------:|--------:|
-| Code search (100 results)     | 17,765 |  1,408 | **92%** |
-| SRE incident debugging        | 65,694 |  5,118 | **92%** |
-| GitHub issue triage           | 54,174 | 14,761 | **73%** |
-| Codebase exploration          | 78,502 | 41,254 | **47%** |
+| Evidence | What it covers | Caveat |
+|---|---|---|
+| [Context waste benchmark](docs/content/docs/context-waste-benchmark.mdx) | Local/offline fixtures, source taxonomy, estimated tokens, per-source aggregates, CCR marker presence, and ledger compatibility. | Fixture-estimated and workload-dependent; no remote providers are called. |
+| [Cache-aware net-savings benchmark](docs/content/docs/cache-aware-net-savings.mdx) | Compress-vs-skip decision support with cache miss penalty and CCR retrieve cost estimates. | Not exact provider billing and not an invoice denominator. |
+| [Acceptance evidence](docs/content/docs/acceptance-evidence.mdx) | H001-H009 local acceptance logs for CCR, proxy retrieve, SQLite backend, log/diff/tree/preset behavior, ledger emission, and benchmarks. | Full pytest has not been claimed unless a log explicitly says it completed. |
 
-**Accuracy preserved on standard benchmarks:**
-
-| Benchmark  | Category | N   | Baseline | Headroom | Delta      |
-|------------|----------|----:|---------:|---------:|------------|
-| GSM8K      | Math     | 100 |    0.870 |    0.870 | **±0.000** |
-| TruthfulQA | Factual  | 100 |    0.530 |    0.560 | **+0.030** |
-| SQuAD v2   | QA       | 100 |        — |  **97%** | 19% compression |
-| BFCL       | Tools    | 100 |        — |  **97%** | 32% compression |
-
-Reproduce: `python -m headroom.evals suite --tier 1` · [Full benchmarks & methodology](https://headroom-docs.vercel.app/docs/benchmarks)
-
-<p align="center">
-  <a href="https://headroomlabs.ai/dashboard">
-    <img src="headroom-savings.png" alt="60B+ tokens saved — community leaderboard" width="820">
-  </a>
-  <br/><b><a href="https://headroomlabs.ai/dashboard">60B+ tokens saved by the community — live leaderboard →</a></b>
-</p>
+Older headline percentages and community dashboard totals are not treated as fork guarantees. Token reduction depends on source mix, cacheability, retrieval rate, task accuracy, and integration path.
 
 ## Agent compatibility matrix
 
@@ -244,7 +250,7 @@ Any OpenAI-compatible client works via `headroom proxy`. MCP-native: `headroom m
 - **Image compression** — 40–90% reduction via trained ML router.
 - **CacheAligner** — detects volatile prefix content and reports cache-stability metrics without rewriting prompts.
 - **IntelligentContext** — score-based context fitting with learned importance.
-- **CCR** — reversible retrieval for cached originals; durable guarantees are tracked in the roadmap.
+- **CCR** — local retrieval for cached originals, with bracket and `<<ccr:...>>` markers and an optional SQLite backend for single-host restart survival.
 - **Cross-agent memory** — shared store, agent provenance, auto-dedup.
 - **SharedContext** — compressed context passing across multi-agent workflows.
 - **`headroom learn`** — plugin-based failure mining for Claude, Codex, Gemini.
@@ -335,7 +341,6 @@ Fork roadmap discussions happen in [Issues](https://github.com/teru-murata/headr
 
 ## Community
 
-- **[Live leaderboard](https://headroomlabs.ai/dashboard)** — 60B+ tokens saved and counting.
 - **[Discord](https://discord.gg/yRmaUNpsPJ)** — questions, feedback, war stories.
 - **[Kompress-base on HuggingFace](https://huggingface.co/chopratejas/kompress-base)** — the model behind our text compression.
 

@@ -13,13 +13,13 @@ Every request flows through three stages:
 ┌──────────────┐     ┌────────────────┐     ┌─────────────────────┐
 │ CacheAligner │────>│ ContentRouter  │────>│ IntelligentContext   │
 │              │     │                │     │                     │
-│ Stabilize    │     │ Detect type &  │     │ Score messages &    │
-│ prefix for   │     │ route to best  │     │ fit within token    │
-│ cache hits   │     │ compressor     │     │ budget              │
+│ Detect cache │     │ Detect type &  │     │ Score messages &    │
+│ risk /       │     │ route to best  │     │ fit within token    │
+│ protect zone │     │ compressor     │     │ budget              │
 └──────────────┘     └────────────────┘     └─────────────────────┘
 ```
 
-1. **CacheAligner** extracts dynamic content (dates, user context) from your system prompt so the static prefix stays cacheable across requests.
+1. **CacheAligner** detects volatile prefix content and cache-risk zones so stable provider-prefix content can be protected by local policy.
 2. **ContentRouter** inspects each tool output and routes it to the optimal compressor -- SmartCrusher for JSON arrays, CodeAwareCompressor for source code, LogCompressor for build output, and so on.
 3. **IntelligentContext** scores every message by importance (recency, semantic relevance, error indicators) and drops the lowest-value messages to fit within the model's context window.
 

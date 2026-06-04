@@ -128,9 +128,9 @@ These are kept even if they exceed the K budget.
 
 ## Provider Interactions
 
-- CacheAligner maximizes Anthropic/OpenAI prefix cache hit rates
-- Token counting uses model-specific tokenizers (tiktoken for OpenAI, calibrated estimation for Anthropic)
-- Compression works with all providers -- no provider-specific limitations
+- CacheAligner detects cache-risk zones; it does not guarantee Anthropic/OpenAI prefix cache hits
+- Token counting may use model-specific tokenizers or calibrated local estimates; provider billing tokens can differ
+- Compression support depends on provider and integration path; protected prefix content should not be rewritten by default
 - Compressed content is valid JSON -- downstream tools and parsers work unchanged
 
 ## TOIN Cold Start

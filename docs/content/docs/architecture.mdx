@@ -103,12 +103,12 @@ After the pipeline, Headroom applies provider-specific cache hints:
 | Provider | Mechanism | Savings |
 |----------|-----------|---------|
 | Anthropic | `cache_control` blocks on stable prefix | Up to 90% on cached tokens |
-| OpenAI | Prefix alignment for automatic caching | Up to 50% on cached tokens |
+| OpenAI | Preserve byte-identical prefixes for automatic caching | Up to 50% on cached tokens |
 | Google | `CachedContent` API | Up to 75% on cached tokens |
 
 ## CCR: Compress-Cache-Retrieve
 
-When SmartCrusher compresses a tool output or Intelligent Context drops messages, the original content is stored in the CCR compression cache. If the LLM needs the full data while the cache entry is still available, it can request retrieval via a `ccr_retrieve` tool call. This makes compression reversible within the active store's retention guarantees.
+When SmartCrusher compresses a tool output or eligible context is omitted, the original content is stored in the CCR compression cache. If the LLM needs the full data while the cache entry is still available, it can request retrieval via a `ccr_retrieve` tool call. This makes compression retrievable within the active store's retention guarantees.
 
 ```
 Compress:  1000 items  ->  15 items  (stored original in CCR)
@@ -127,7 +127,7 @@ Cold start: For new tool types, TOIN falls back to statistical heuristics. Patte
 ## What Headroom Does NOT Touch
 
 - **User messages**: Never compressed (the user's intent must be preserved exactly)
-- **System prompts**: Content preserved; only dynamic parts are relocated for caching
+- **System prompts and stable provider prefixes**: Content preserved by default; cache-aware rewrite/delta behavior is future explicit work
 - **Code**: Passes through unchanged unless tree-sitter AST compression is explicitly enabled
 - **Model responses**: Returned unchanged from the provider
 - **Short content**: Tool outputs under 200 tokens pass through (overhead exceeds savings)

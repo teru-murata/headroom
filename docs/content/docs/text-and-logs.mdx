@@ -206,11 +206,24 @@ result = preset.route_and_compress(
 
 Supported local routes include test logs, build logs, search results, file
 trees, git diffs, package metadata, MCP/tool responses, and generic noisy tool
-output. Source code is preserved verbatim by default. When a preset omits
-substantial output, it uses the existing local CCR marker/store flow so the
-full original can be retrieved locally. Hosted/team marker policy, Redis/Valkey
-profiles, and SaaS retrieve authorization remain outside Headroom's local
-preset layer.
+output. These are deterministic local transformations, not LLM summarization.
+
+The preset keeps source categories separate:
+
+| Source category | Preservation contract |
+|---|---|
+| Source code | Preserved verbatim by default; Headroom does not blindly compress source code. |
+| Test/build logs | Preserve command, exit code, failed test/build target, assertion or diagnostic, traceback evidence, and file/line references. |
+| Diffs | Preserve file paths, file status, hunk headers, changed symbols, nearby imports, and test-impact hints where detectable. |
+| File trees | Preserve package roots, source/test directory shape, config/build files, and changed or recently referenced paths. |
+| Search results | Preserve file paths, line numbers, matches, and file diversity. |
+| Package metadata | Preserve package name, scripts, dependencies, toolchain, and build hints. |
+| MCP/tool outputs | Preserve tool name, status, errors, result counts, and the first relevant result. |
+
+When a preset omits substantial output, it uses the existing local CCR
+marker/store flow so the full original can be retrieved locally while the store
+entry is available. Hosted/team marker policy, Redis/Valkey profiles, and SaaS
+retrieve authorization remain outside Headroom's local preset layer.
 
 ## TextCompressor
 

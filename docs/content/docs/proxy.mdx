@@ -3,7 +3,10 @@ title: Proxy Server
 description: Run the Headroom proxy to compress LLM traffic for any client — Claude Code, Cursor, OpenAI SDK, or custom apps.
 ---
 
-The Headroom proxy is a standalone HTTP server that compresses all LLM traffic passing through it. Point any client at the proxy and get automatic context optimization.
+The Headroom proxy is a standalone HTTP server that routes eligible request
+content through local compression before forwarding to the configured provider.
+It is intended for local developer workflows by default; it does not implement
+hosted/team bridge operation or SaaS retrieve authorization.
 
 ## Starting the proxy
 
@@ -64,7 +67,11 @@ Binding the proxy to `0.0.0.0` does not make `/v1/retrieve*` available to non-lo
 | `--code-aware` / `--no-code-aware` | disabled | Enable or disable AST-based code compression. Requires `headroom-ai[code]`. |
 | `--code-graph` | `false` | Index the current project and watch files via codebase-memory-mcp. |
 
-By default, the proxy uses the shared **ContentRouter** pipeline. It routes text, logs, JSON, code, images, and tool outputs through the currently enabled compressors and preserves reversible CCR markers where applicable.
+By default, the proxy uses the shared **ContentRouter** pipeline. It routes
+eligible text, logs, JSON, images, and tool outputs through the currently
+enabled compressors and preserves reversible CCR markers where applicable.
+Coding-agent source code and stable provider-prefix content are protected unless
+the selected mode or future explicit feature says otherwise.
 
 ```bash
 # Maximize compression
@@ -128,7 +135,8 @@ curl http://localhost:8787/stats
 
 ### `GET /stats-history`
 
-Durable history with hourly, daily, weekly, and monthly rollups. Powers the `/dashboard` view.
+Durable local history with hourly, daily, weekly, and monthly rollups. Powers
+the proxy's local `/dashboard` view when that local process is running.
 
 ```bash
 curl http://localhost:8787/stats-history

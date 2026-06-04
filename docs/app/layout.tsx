@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     template: '%s | Headroom',
   },
   description:
-    'Compress everything your AI agent reads — tool outputs, logs, files, RAG chunks. Same answers, fraction of the tokens. Library, proxy, MCP server. Local-first. Apache 2.0.',
+    'Local-first compression for noisy coding-agent context such as logs, diffs, file trees, search results, tool outputs, and RAG chunks. Library, proxy, MCP server. Apache 2.0.',
   metadataBase: new URL(SITE_URL),
   alternates: {
     canonical: '/',
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
     siteName: 'Headroom',
     title: 'Headroom — Context Optimization Layer for AI Agents',
     description:
-      'Compress tool outputs, logs, files, and RAG chunks before they reach the LLM. 60–95% fewer tokens, same answers.',
+      'Optimize noisy coding-agent context with local compression, CCR retrieval, and source-level provenance.',
     url: '/',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Headroom — Context Optimization Layer for AI Agents',
     description:
-      'Compress tool outputs, logs, files, and RAG chunks before they reach the LLM. 60–95% fewer tokens, same answers.',
+      'Optimize noisy coding-agent context with local compression, CCR retrieval, and source-level provenance.',
   },
 };
 

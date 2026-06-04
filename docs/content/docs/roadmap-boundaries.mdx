@@ -1,0 +1,42 @@
+---
+title: Roadmap Boundaries
+description: Separate future Headroom core work from hosted/team bridge work.
+---
+
+Headroom is the compression/local-runtime/core repository. It should keep local
+compression, local CCR behavior, deterministic source routing, local telemetry
+production, and local benchmark tooling separate from hosted/team bridge
+operation.
+
+## Future Headroom Advanced Core
+
+These items remain Headroom-side roadmap work:
+
+- #6 true cache-aware alignment / delta mode
+- #7 reversible conversation-history compaction
+- #12 multimodal and realtime-agent compression
+
+Conversation-history compaction is future and opt-in. Multimodal/realtime
+compression is also future work and has separate latency and fidelity criteria.
+Current coding-agent preset behavior deliberately protects stable conversation
+and provider-prefix content unless an explicit future feature says otherwise.
+
+## Future coding-agent-bridge Work
+
+These items belong to `mishima-computing/coding-agent-bridge`, not this
+Headroom repository:
+
+- hosted/shared bridge deployment
+- tenant authorization, API keys, and policy
+- hosted ledger ingest, retention, and reconciliation
+- billing
+- dashboards
+- conformance authority
+- partner-runnable deployment profiles
+- hosted Langfuse/LiteLLM export
+- sandbox/code-execution provenance bridge
+- hosted Redis/Valkey CCR profile
+
+Shared schemas, markers, and telemetry names can be versioned public contracts
+between repositories. Headroom local support does not define SaaS retrieve
+authorization or production multi-tenant durability.
