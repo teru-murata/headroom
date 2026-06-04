@@ -1,0 +1,79 @@
+﻿H001 validation log
+title: CCR marker parser and tool injection
+commit: 1d7cf681dd94d4be822203a8008005c1e0c2d60c
+captured_at: 2026-06-04T14:57:54+09:00
+command: python -m pytest tests/test_ccr_tool_injection.py
+full_pytest: not run
+sanitized_paths: true
+
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- <python-runtime>\python.exe
+cachedir: .pytest_cache
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 57 items
+
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_existing_bracket_marker_parses PASSED [  1%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_smartcrusher_angle_marker_parses PASSED [  3%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_smartcrusher_opaque_blob_marker_parses PASSED [  5%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_supported_hash_validation_matches_local_emitters PASSED [  7%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123] PASSED [  8%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123def456abc123def456abc123] PASSED [ 10%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123xyz456] PASSED [ 12%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123def456\n] PASSED [ 14%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[../abc123def456] PASSED [ 15%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123def456/secret] PASSED [ 17%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[] PASSED [ 19%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[<<ccr:abc123def456 ../secret>>] PASSED [ 21%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[<<ccr:abc123def456,path\\secret>>] PASSED [ 22%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[<<ccr:abc123def456..secret>>] PASSED [ 24%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[[10 items compressed to 1. Retrieve more: hash=abc123def456 ../secret]] PASSED [ 26%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[[10 items compressed to 1. Retrieve more: hash=abc123def456x]] PASSED [ 28%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_multiple_markers_are_returned_in_text_order PASSED [ 29%]
+tests/test_ccr_tool_injection.py::TestCCRToolDefinition::test_anthropic_format PASSED [ 31%]
+tests/test_ccr_tool_injection.py::TestCCRToolDefinition::test_openai_format PASSED [ 33%]
+tests/test_ccr_tool_injection.py::TestCCRToolDefinition::test_google_format PASSED [ 35%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_for_markers_finds_hash PASSED [ 36%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_for_smartcrusher_angle_marker_finds_hash PASSED [ 38%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_for_markers_multiple_hashes PASSED [ 40%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_no_duplicates PASSED [ 42%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_anthropic_content_blocks PASSED [ 43%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_tool_when_compression_detected PASSED [ 45%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_tool_when_smartcrusher_marker_detected PASSED [ 47%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_tool_adds_to_existing PASSED [ 49%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_skip_injection_if_tool_present_anthropic PASSED [ 50%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_skip_injection_if_tool_present_openai PASSED [ 52%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_no_injection_without_compression PASSED [ 54%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_system_instructions PASSED [ 56%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_process_request_full_flow PASSED [ 57%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_anthropic_format PASSED [ 59%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_openai_format PASSED [ 61%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_non_ccr_tool PASSED [ 63%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_malformed_openai_args PASSED [ 64%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_accepts_smartcrusher_hash PASSED [ 66%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_accepts_smartcrusher_marker_text PASSED [ 68%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_accepts_bracket_marker_text PASSED [ 70%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_short_hash PASSED [ 71%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_long_hash PASSED [ 73%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_non_hex_characters PASSED [ 75%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_path_traversal_marker PASSED [ 77%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_hash_with_whitespace PASSED [ 78%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_accepts_valid_24_char_hash PASSED [ 80%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_accepts_valid_12_char_hash PASSED [ 82%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_accepts_uppercase_hex PASSED [ 84%]
+tests/test_ccr_tool_injection.py::TestSystemInstructions::test_create_instructions_single_hash PASSED [ 85%]
+tests/test_ccr_tool_injection.py::TestSystemInstructions::test_create_instructions_multiple_hashes PASSED [ 87%]
+tests/test_ccr_tool_injection.py::TestSystemInstructions::test_create_instructions_truncates_many_hashes PASSED [ 89%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_textcompressor_format PASSED [ 91%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_searchcompressor_format PASSED [ 92%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_mixed_compressor_formats PASSED [ 94%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_generic_compressed_marker PASSED [ 96%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerRetrieveIntegration::test_existing_bracket_marker_tool_call_resolves_store_entry PASSED [ 98%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerRetrieveIntegration::test_smartcrusher_marker_end_to_end_resolves_store_entry PASSED [100%]
+
+============================= 57 passed in 0.63s ==============================
+
+exit_code: 0
+Full pytest was not run for this validation log.
