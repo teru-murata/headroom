@@ -78,10 +78,23 @@ class TestCCRRetrieveEndpoint:
         assert "hash required" in response.json()["detail"]
 
     def test_retrieve_nonexistent_hash(self, client):
-        """Request with nonexistent hash should return 404."""
-        response = client.post("/v1/retrieve", json={"hash": "nonexistent123"})
+        """Request with well-formed nonexistent hash should return 404."""
+        response = client.post("/v1/retrieve", json={"hash": "deadbeef0000"})
         assert response.status_code == 404
         assert "not found or expired" in response.json()["detail"]
+
+    def test_retrieve_rejects_malformed_hash(self, client):
+        """Malformed local CCR hashes are rejected before store lookup."""
+        response = client.post("/v1/retrieve", json={"hash": "../deadbeef0000"})
+        assert response.status_code == 400
+        assert "unsupported CCR hash or marker" in response.json()["detail"]
+
+        marker_response = client.post(
+            "/v1/retrieve",
+            json={"hash": "<<ccr:deadbeef0000 ../secret>>"},
+        )
+        assert marker_response.status_code == 400
+        assert "unsupported CCR hash or marker" in marker_response.json()["detail"]
 
     def test_retrieve_full_content(self, client):
         """Full retrieval returns original content."""
@@ -106,6 +119,41 @@ class TestCCRRetrieveEndpoint:
         retrieved_items = json.loads(data["original_content"])
         assert len(retrieved_items) == 50
         assert retrieved_items[0]["id"] == 0
+
+    def test_retrieve_marker_text_uses_shared_compression_store(self, client):
+        """Proxy retrieve accepts bracket marker text and reads the same local store."""
+        store = get_compression_store()
+        original = json.dumps([{"id": 1, "message": "stored outside request"}])
+        hash_key = store.store(original=original, compressed="[]")
+        marker = f"[10 items compressed to 1. Retrieve more: hash={hash_key}]"
+
+        response = client.post("/v1/retrieve", json={"hash": marker})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["hash"] == hash_key
+        assert data["original_content"] == original
+
+    def test_retrieve_smartcrusher_marker_text(self, client):
+        """Proxy retrieve accepts SmartCrusher angle markers backed by the local store."""
+        store = get_compression_store()
+        hash_key = "89f81e97033e"
+        original = json.dumps([{"id": i} for i in range(5)])
+        store.store(
+            original=original,
+            compressed='[{"_ccr_dropped":"<<ccr:89f81e97033e 2_rows_offloaded>>"}]',
+            explicit_hash=hash_key,
+        )
+
+        response = client.post(
+            "/v1/retrieve",
+            json={"hash": "<<ccr:89f81e97033e 2_rows_offloaded>>"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["hash"] == hash_key
+        assert data["original_content"] == original
 
     def test_retrieve_with_search(self, client):
         """Search retrieval filters by query."""
@@ -159,7 +207,7 @@ class TestCCRRetrieveEndpoint:
         """Query mode should not mask a missing hash as an empty search."""
         response = client.post(
             "/v1/retrieve",
-            json={"hash": "nonexistent123", "query": "anything"},
+            json={"hash": "deadbeef0000", "query": "anything"},
         )
         assert response.status_code == 404
 
@@ -247,7 +295,7 @@ class TestCCRRetrieveGetEndpoint:
 
     def test_get_retrieve_nonexistent(self, client):
         """GET with nonexistent hash returns 404."""
-        response = client.get("/v1/retrieve/nonexistent123")
+        response = client.get("/v1/retrieve/deadbeef0000")
         assert response.status_code == 404
 
 
@@ -470,7 +518,7 @@ class TestEndToEndTOINIntegration:
             cost_tracking_enabled=False,
         )
         app = create_app(config)
-        with TestClient(app) as client:
+        with TestClient(app, client=("127.0.0.1", 12345)) as client:
             yield client
         reset_compression_store()
 

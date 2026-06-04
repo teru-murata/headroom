@@ -71,6 +71,7 @@ from headroom.ccr import (
     ContextTracker,
     ContextTrackerConfig,
     ResponseHandlerConfig,
+    normalize_ccr_hash,
     parse_tool_call,
 )
 from headroom.config import (
@@ -127,6 +128,7 @@ from headroom.proxy.helpers import (
     is_anthropic_auth,  # noqa: F401
     jitter_delay_ms,
 )
+from headroom.proxy.loopback_guard import require_loopback as _require_loopback
 from headroom.proxy.memory_handler import MemoryConfig, MemoryHandler
 
 # Data models (extracted to headroom/proxy/models.py for maintainability)
@@ -162,6 +164,15 @@ from headroom.transforms import (
     TransformPipeline,
     is_tree_sitter_available,
 )
+
+
+def _normalize_ccr_hash_or_400(value: Any) -> str:
+    """Normalize local CCR hash or marker text for proxy retrieve routes."""
+    try:
+        return normalize_ccr_hash(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="unsupported CCR hash or marker") from exc
+
 
 AnyLLMBackend: Any = None
 LiteLLMBackend: Any = None
@@ -1810,7 +1821,6 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
     from headroom.proxy.debug_introspection import (
         collect_tasks as _collect_tasks,
     )
-    from headroom.proxy.loopback_guard import require_loopback as _require_loopback
 
     @app.get("/debug/tasks", dependencies=[Depends(_require_loopback)])
     async def debug_tasks(stack: bool = False):
@@ -2462,6 +2472,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         if not hash_key:
             raise HTTPException(status_code=400, detail="hash required")
 
+        hash_key = _normalize_ccr_hash_or_400(hash_key)
         store = get_compression_store()
 
         if query:
@@ -2776,6 +2787,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
     @app.get("/v1/retrieve/{hash_key}", dependencies=[Depends(_require_loopback)])
     async def ccr_retrieve_get(hash_key: str, query: str | None = None):
         """GET version of CCR retrieve for easier testing."""
+        hash_key = _normalize_ccr_hash_or_400(hash_key)
         store = get_compression_store()
 
         if query:
@@ -2856,13 +2868,19 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         store = get_compression_store()
 
         if query:
-            results = store.search(hash_key, query)
-            retrieval_data = {
-                "hash": hash_key,
-                "query": query,
-                "results": results,
-                "count": len(results),
-            }
+            if not store.exists(hash_key, clean_expired=True):
+                retrieval_data = {
+                    "error": "Entry not found or expired (TTL: 5 minutes)",
+                    "hash": hash_key,
+                }
+            else:
+                results = store.search(hash_key, query)
+                retrieval_data = {
+                    "hash": hash_key,
+                    "query": query,
+                    "results": results,
+                    "count": len(results),
+                }
         else:
             entry = store.retrieve(hash_key)
             if entry:
