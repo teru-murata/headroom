@@ -1,0 +1,52 @@
+---
+title: Cache-Aware Net Savings
+description: Local model for deciding when compression should preserve provider cacheability.
+---
+
+Headroom should optimize estimated net savings, not only raw input token
+reduction. Rewriting a stable provider-cache prefix can be harmful when the
+lost cache value is larger than the tokens saved by compression.
+
+## Local Decision Model
+
+The local model classifies content into cache zones:
+
+- `protected_prefix`: never compressed by this model.
+- `stable_prefix`: compressed only when estimated net savings clearly exceed
+  the cache miss penalty.
+- `volatile_tail`: compressed when savings remain positive after local
+  penalties.
+- `live_tool_output`: usually a strong compression candidate when evidence
+  guards pass.
+- `unknown`: handled conservatively.
+
+The model estimates:
+
+- gross saved tokens
+- provider cache miss penalty
+- expected CCR retrieval cost
+- net saved tokens
+- optional before/after cost when caller-supplied local pricing is provided
+
+These estimates are workload- and provider-dependent. They are decision support,
+not exact provider billing tokens and not an invoice denominator.
+
+## Benchmark
+
+Run the focused local benchmark:
+
+```bash
+python -m headroom.benchmarks.net_savings.runner
+```
+
+The report includes per-fixture rows plus totals grouped by `source_type`,
+`cache_zone`, and decision. `source_type` values are compatible with the local
+context waste benchmark taxonomy, so context-waste reports can identify where
+tokens are spent while this benchmark models whether compression still helps
+after cache and CCR retrieval costs.
+
+## Boundary
+
+Headroom owns the local compress-vs-skip model and local benchmark. Hosted ROI
+dashboards, customer-facing savings reports, provider pricing catalogs, billing,
+and remote retrieve authorization belong to `coding-agent-bridge`.

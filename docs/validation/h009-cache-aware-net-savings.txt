@@ -1,0 +1,131 @@
+H009 validation log
+title: cache-aware net-savings benchmark and decision model
+commit: uncommitted H009 working tree
+captured_at: 2026-06-04T23:39:56+09:00
+full_pytest: not run
+sanitized_paths: true
+
+Scope:
+- local deterministic cache-aware net-savings benchmark and decision model
+- H008 source-taxonomy-compatible source_type handling
+- local docs for cache-aware net-savings behavior
+- no SaaS tenant policy, hosted bridge, control-plane, billing, dashboard, deployment, Redis, or coding-agent-bridge changes
+- raw Codex JSONL transcript was not committed
+
+Primary command:
+python -m pytest tests/test_cache_aware_net_savings.py
+
+Primary result:
+Exit code: 0
+12 passed, 1 warning in 0.78s
+
+Representative accepted test evidence:
+tests/test_cache_aware_net_savings.py::test_protected_prefix_is_never_compressed PASSED
+tests/test_cache_aware_net_savings.py::test_stable_prefix_skips_when_cache_miss_penalty_exceeds_gross_savings PASSED
+tests/test_cache_aware_net_savings.py::test_live_tool_output_compresses_when_net_savings_positive_and_guard_passes PASSED
+tests/test_cache_aware_net_savings.py::test_evidence_guard_failure_bypasses_compression PASSED
+tests/test_cache_aware_net_savings.py::test_ccr_retrieve_cost_reduces_net_saved_tokens PASSED
+tests/test_cache_aware_net_savings.py::test_no_pricing_config_still_returns_token_based_decision PASSED
+tests/test_cache_aware_net_savings.py::test_pricing_config_returns_estimated_costs PASSED
+tests/test_cache_aware_net_savings.py::test_unknown_weak_signal_is_conservative PASSED
+tests/test_cache_aware_net_savings.py::test_cache_zone_classifier_identifies_supported_cases PASSED
+tests/test_cache_aware_net_savings.py::test_decision_output_includes_reason_confidence_and_warnings PASSED
+tests/test_cache_aware_net_savings.py::test_benchmark_runner_produces_report_with_required_groups PASSED
+tests/test_cache_aware_net_savings.py::test_skip_preserve_cache_can_emit_ledger_compatible_event PASSED
+
+Compatibility commands:
+python -m pytest tests/test_context_waste_benchmark.py
+result: 14 passed, 1 warning in 0.73s
+
+python -m pytest tests/test_coding_agent_presets.py
+result: 12 passed, 1 warning in 0.75s
+
+python -m pytest tests/test_provenance_ledger_emitter.py
+result: 12 passed, 1 warning in 0.78s
+
+python -m pytest tests/test_log_crusher_acceptance.py
+result: 8 passed, 1 warning in 0.74s
+
+python -m pytest tests/test_diff_file_tree_crusher_acceptance.py
+result: 14 passed, 1 warning in 0.75s
+
+python -m pytest tests/test_ccr_tool_injection.py
+result: 57 passed, 1 warning in 0.77s
+
+python -m pytest tests/test_proxy_ccr.py
+result: 30 passed, 4 warnings in 3.44s
+
+Benchmark runner command:
+python -m headroom.benchmarks.net_savings.runner --output .headroom\net-savings-report.json
+
+Benchmark runner result:
+Exit code: 0
+generated: .headroom\net-savings-report.json
+benchmark_version: cache-aware-net-savings-v0
+fixture_count: 10
+
+Decision distribution:
+- compress: 5
+- skip_preserve_cache: 2
+- bypass_accuracy_guard: 1
+- bypass_protected_prefix: 1
+- insufficient_signal: 1
+
+Totals:
+- gross_saved_tokens_estimated: 5171
+- cache_miss_penalty_tokens_estimated: 1426
+- ccr_retrieve_cost_tokens_estimated: 600
+- net_saved_tokens_estimated: 3145
+- compress_count: 5
+- bypass_or_skip_count: 5
+- estimated_net_savings: 0.0051389999999999995
+
+Source-type distribution:
+- tool_outputs
+- test_logs
+- git_diffs
+- mcp_tool_response
+
+Context-waste runner compatibility:
+python -m headroom.benchmarks.context_waste.runner --out .headroom\context-waste-report.json
+result: exit 0, 18 fixtures, 11 CCR retrievable rows, ledger source consistency matched 18/18
+
+Additional validation commands:
+ruff check headroom tests
+result: passed
+
+ruff format --check headroom tests
+result: passed
+note: ruff reported a non-fatal cache write warning: Access is denied.
+
+git diff --check
+result: passed
+note: PowerShell/Git reported CRLF warnings for touched text files.
+
+cd docs; npm exec fumadocs-mdx
+result: passed
+output: [MDX] generated files in 7.83929999999998ms
+
+Known non-fatal warnings observed:
+- PytestUnhandledThreadExceptionWarning from subprocess reader cp1252 decode of byte 0x8f
+- StarletteDeprecationWarning in proxy tests
+- AnthropicProvider tiktoken approximation warning in proxy tests
+- TOIN get_recommendation() deprecation warning
+
+Not run:
+- full python -m pytest was not run
+
+Acceptance coverage retained:
+- protected prompt-prefix content is never rewritten
+- stable-prefix compression is skipped when estimated cache miss penalty exceeds gross savings
+- live tool output can compress when net savings is positive and the evidence guard passes
+- evidence guard failure bypasses compression
+- CCR retrieve cost reduces net saved tokens
+- pricing config is optional for token-only decisions and explicit for cost estimates
+- unknown weak-signal content remains conservative
+- benchmark runner produces deterministic fixture report groups
+- H008 source-taxonomy names are accepted by cache-zone classification and net-savings report grouping
+- skip_preserve_cache can emit a ledger-compatible event
+- existing context-waste benchmark, coding-agent preset, provenance ledger, log crusher, diff/file-tree crusher, marker injection, and proxy retrieve suites stayed green
+
+Full pytest was not run for this validation log.

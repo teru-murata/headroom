@@ -19,6 +19,7 @@
     "---Cache & Context---",
     "cache-optimization",
     "context-waste-benchmark",
+    "cache-aware-net-savings",
     "context-management",
     "---Memory---",
     "memory",

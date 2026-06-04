@@ -1,0 +1,104 @@
+{
+  "benchmark_version": "cache-aware-net-savings-v0",
+  "pricing_config": {
+    "input_token_price_per_million": 3.0,
+    "cached_token_price_per_million": 0.3,
+    "output_token_price_per_million": null
+  },
+  "fixtures": [
+    {
+      "id": "protected-prefix",
+      "source_type": "tool_outputs",
+      "cache_zone": "protected_prefix",
+      "content": "System: You are a coding agent. Preserve all developer instructions exactly.\nDeveloper: Do not rewrite the prefix.",
+      "compressed_tokens_estimated": 8,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "stable-prefix-low-savings",
+      "source_type": "tool_outputs",
+      "cache_zone": "stable_prefix",
+      "content": "cached architecture note\ncached architecture note\ncached architecture note\ncached architecture note\ncached architecture note",
+      "original_tokens_estimated": 220,
+      "compressed_tokens_estimated": 190,
+      "provider_cached_tokens": 180,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "stable-prefix-cache-miss-larger",
+      "source_type": "tool_outputs",
+      "cache_zone": "stable_prefix",
+      "content": "cached prefix block with repeated setup\ncached prefix block with repeated setup\ncached prefix block with repeated setup\ncached prefix block with repeated setup",
+      "original_tokens_estimated": 1200,
+      "compressed_tokens_estimated": 300,
+      "provider_cached_tokens": 1100,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "live-tool-output-net-positive",
+      "source_type": "test_logs",
+      "cache_zone": "live_tool_output",
+      "content": "$ python -m pytest tests/test_checkout.py -q\nFAILED tests/test_checkout.py::test_total\nAssertionError: expected 10 got 9\ntests/test_checkout.py:42\nexit code: 1\nPASSED noise_001\nPASSED noise_002\nPASSED noise_003\nPASSED noise_004\nPASSED noise_005\nPASSED noise_006\nPASSED noise_007\nPASSED noise_008\nPASSED noise_009",
+      "original_tokens_estimated": 1600,
+      "compressed_tokens_estimated": 300,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "test-log-evidence-pass",
+      "source_type": "test_logs",
+      "cache_zone": "live_tool_output",
+      "content": "$ npm test -- --run src/cart.test.ts\nFAIL src/cart.test.ts > totals\nAssertionError: expected 19.99 to be 14.99\nsrc/cart.test.ts:88:21\nexit code: 1\nPASS src/noise1.test.ts\nPASS src/noise2.test.ts\nPASS src/noise3.test.ts\nPASS src/noise4.test.ts",
+      "original_tokens_estimated": 900,
+      "compressed_tokens_estimated": 240,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "test-log-evidence-fail",
+      "source_type": "test_logs",
+      "cache_zone": "live_tool_output",
+      "content": "$ go test ./...\n--- FAIL: TestRetryBackoff\nretry/retry_test.go:87\nexpected delay 200ms, got 20ms\nexit code: 1",
+      "original_tokens_estimated": 700,
+      "compressed_tokens_estimated": 180,
+      "task_accuracy_guard_passed": false
+    },
+    {
+      "id": "git-diff-net-positive",
+      "source_type": "git_diffs",
+      "cache_zone": "live_tool_output",
+      "content": "diff --git a/src/auth.ts b/src/auth.ts\n@@ -1,6 +1,8 @@\n import { session } from './session';\n+import { audit } from './audit';\n export function requireUser(id: string) {\n+  audit(id);\n   return session(id);\n }\n",
+      "original_tokens_estimated": 1000,
+      "compressed_tokens_estimated": 260,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "unknown-weak-signal",
+      "source_type": "tool_outputs",
+      "cache_zone": "unknown",
+      "content": "short mixed context with no strong source hints",
+      "original_tokens_estimated": 120,
+      "compressed_tokens_estimated": 100,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "ccr-heavy-high-retrieve-rate",
+      "source_type": "mcp_tool_response",
+      "cache_zone": "live_tool_output",
+      "content": "{\"tool\":\"repo.search\",\"status\":\"success\",\"results\":[{\"path\":\"src/auth.ts\"},{\"path\":\"tests/auth.test.ts\"}]}",
+      "original_tokens_estimated": 1000,
+      "compressed_tokens_estimated": 300,
+      "ccr_marker_present": true,
+      "ccr_retrieve_rate_estimate": 0.6,
+      "task_accuracy_guard_passed": true
+    },
+    {
+      "id": "no-pricing-config",
+      "source_type": "tool_outputs",
+      "cache_zone": "volatile_tail",
+      "content": "$ tool run\nstatus: success\nitem 1\nitem 2\nitem 3\nitem 4\nitem 5\nitem 6",
+      "original_tokens_estimated": 500,
+      "compressed_tokens_estimated": 220,
+      "disable_pricing": true,
+      "task_accuracy_guard_passed": true
+    }
+  ]
+}
