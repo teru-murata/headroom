@@ -1,4 +1,4 @@
-﻿$ npm ci && npm run build
+$ npm ci && npm run build
 npm http fetch GET 200 https://registry.example.invalid/react 24ms
 npm http fetch GET 200 https://registry.example.invalid/typescript 31ms
 npm http fetch GET 200 https://registry.example.invalid/vite 28ms

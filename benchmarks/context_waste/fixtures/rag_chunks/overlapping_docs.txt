@@ -1,4 +1,4 @@
-﻿doc_id=auth-guide score=0.91 source=docs/auth.md
+doc_id=auth-guide score=0.91 source=docs/auth.md
 requireUser must be called before writing checkout state.
 Standard footer: internal docs are examples only.
 Standard footer: internal docs are examples only.

@@ -1,4 +1,4 @@
-﻿# Agent Instructions
+# Agent Instructions
 
 Do not touch billing, dashboard, deployment, or hosted auth code.
 Run python -m pytest tests/test_checkout.py before changing checkout logic.

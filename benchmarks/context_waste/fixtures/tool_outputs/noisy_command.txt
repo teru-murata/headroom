@@ -1,4 +1,4 @@
-﻿$ npm run generate && npm run check
+$ npm run generate && npm run check
 download package 001 ################################################
 download package 002 ################################################
 download package 003 ################################################

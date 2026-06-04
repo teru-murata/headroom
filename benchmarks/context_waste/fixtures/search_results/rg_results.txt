@@ -1,4 +1,4 @@
-﻿$ rg "requireUser|CheckoutSummary" -n src tests packages
+$ rg "requireUser|CheckoutSummary" -n src tests packages
 src/server/auth.ts:12:export function requireUser(userId: string): SessionUser {
 src/server/auth.ts:13:  if (!userId) throw new Error("missing user")
 src/server/auth.ts:44:  return requireUser(session.user.id)

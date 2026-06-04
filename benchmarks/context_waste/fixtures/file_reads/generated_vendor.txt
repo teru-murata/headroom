@@ -1,4 +1,4 @@
-﻿generated-client.txt
+generated-client.txt
 schema_version=2026-06-04
 field repeated boilerplate: customer.id string optional generated
 field repeated boilerplate: customer.id string optional generated

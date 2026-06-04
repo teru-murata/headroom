@@ -1,4 +1,4 @@
-﻿{
+{
   "tool": "mcp.schema.list",
   "status": "success",
   "arguments": {"server": "filesystem", "include_generated": true},

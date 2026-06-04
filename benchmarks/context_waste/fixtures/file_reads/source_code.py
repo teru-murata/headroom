@@ -1,4 +1,4 @@
-﻿from decimal import Decimal
+from decimal import Decimal
 
 
 def calculate_discount(total: Decimal, percent: Decimal) -> Decimal:

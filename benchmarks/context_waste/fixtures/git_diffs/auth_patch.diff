@@ -1,4 +1,4 @@
-﻿diff --git a/src/server/auth.ts b/src/server/auth.ts
+diff --git a/src/server/auth.ts b/src/server/auth.ts
 index 1111111..2222222 100644
 --- a/src/server/auth.ts
 +++ b/src/server/auth.ts

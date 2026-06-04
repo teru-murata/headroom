@@ -1,4 +1,4 @@
-﻿artifact_id=sandbox-run-17
+artifact_id=sandbox-run-17
 command: python /tmp/check.py
 exit code: 1
 kept_out_raw_artifact=.headroom/artifacts/sandbox-run-17/raw.log

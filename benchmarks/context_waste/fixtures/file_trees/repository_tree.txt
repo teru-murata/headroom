@@ -1,4 +1,4 @@
-﻿.
+.
 |-- package.json
 |-- pyproject.toml
 |-- Cargo.toml

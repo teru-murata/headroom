@@ -1,4 +1,4 @@
-﻿{
+{
   "tool": "db.query",
   "status": "success",
   "arguments": {"sql": "select * from orders where customer_id = ?"},

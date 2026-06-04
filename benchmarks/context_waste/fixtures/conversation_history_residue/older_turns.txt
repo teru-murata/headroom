@@ -1,4 +1,4 @@
-﻿turn_id=42 role=assistant
+turn_id=42 role=assistant
 older plan repeated: inspect auth files then run tests
 older plan repeated: inspect auth files then run tests
 older plan repeated: inspect auth files then run tests

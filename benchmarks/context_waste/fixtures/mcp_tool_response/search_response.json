@@ -1,4 +1,4 @@
-﻿{
+{
   "tool": "repo.search",
   "status": "error",
   "arguments": {"query": "requireUser", "root": "."},
