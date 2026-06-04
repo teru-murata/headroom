@@ -1,0 +1,57 @@
+H006 validation log
+title: coding-agent output compression preset
+commit: a0c0cb9f4641463e57b5c3ebadb6429c85603211
+captured_at: 2026-06-04T22:16:05+09:00
+full_pytest: not run
+sanitized_paths: true
+
+Scope:
+- local coding-agent output preset and route coverage
+- no SaaS, control-plane, billing, dashboard, deployment, Redis, or coding-agent-bridge changes
+- raw Codex JSONL transcript was not committed
+
+Quality gate summary:
+- tests/test_coding_agent_presets.py: 12 passed
+- tests/test_log_crusher_acceptance.py: 8 passed
+- tests/test_diff_file_tree_crusher_acceptance.py: 14 passed
+- tests/test_ccr_tool_injection.py: 57 passed
+- tests/test_proxy_ccr.py: 30 passed
+- ruff check headroom tests: passed
+- ruff format --check headroom tests: passed
+- git diff --check: passed
+- npm exec fumadocs-mdx: passed
+
+Primary command:
+python -m pytest tests/test_coding_agent_presets.py
+
+Representative accepted test evidence:
+tests/test_coding_agent_presets.py::test_test_log_routes_to_evidence_preserving_log_compressor PASSED
+tests/test_coding_agent_presets.py::test_build_log_routes_to_log_compressor_and_preserves_root_cause PASSED
+tests/test_coding_agent_presets.py::test_search_results_group_preserves_query_paths_lines_and_matches PASSED
+tests/test_coding_agent_presets.py::test_file_tree_routes_to_file_tree_compressor_and_preserves_repo_shape PASSED
+tests/test_coding_agent_presets.py::test_git_diff_routes_to_diff_compressor_and_preserves_edit_targets PASSED
+tests/test_coding_agent_presets.py::test_package_metadata_preserves_scripts_dependencies_and_toolchain PASSED
+tests/test_coding_agent_presets.py::test_mcp_tool_response_preserves_tool_status_error_counts_and_first_result PASSED
+tests/test_coding_agent_presets.py::test_generic_tool_output_preserves_errors_paths_status_and_collapses_noise PASSED
+tests/test_coding_agent_presets.py::test_source_code_is_preserved_verbatim_not_blindly_compressed PASSED
+tests/test_coding_agent_presets.py::test_ccr_retrievability_for_omitted_preset_output PASSED
+tests/test_coding_agent_presets.py::test_auto_classification_and_metadata_are_stable PASSED
+tests/test_coding_agent_presets.py::test_unknown_source_type_falls_back_safely_without_losing_evidence PASSED
+
+Compatibility evidence:
+- H004 log crusher acceptance stayed green
+- H005 diff/file-tree acceptance stayed green
+- H001 marker parse/injection/retrieve path stayed green
+- H002 proxy CCR retrieve path stayed green
+
+Acceptance coverage retained:
+- test logs and build logs route to evidence-preserving compression
+- search results preserve query, path, line, and match evidence
+- file trees preserve repository shape and configuration roots
+- git diffs preserve edit targets and review-critical hints
+- package metadata preserves scripts, dependencies, and toolchain hints
+- MCP and generic tool outputs preserve status, error counts, paths, and first-result evidence
+- source code bypass remains conservative instead of blindly compressing code
+- omitted preset output remains retrievable through local CCR marker parsing, injection, and store lookup
+
+Full pytest was not run for this validation log.

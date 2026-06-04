@@ -1,0 +1,52 @@
+H005 validation log
+title: diff and file-tree crusher acceptance
+commit: 8ebdcc70609aee2dcd5116574f7f5f28a75fce8f
+source_session: rollout-2026-06-04T08-44-26-019e8fdf-c09a-7213-ae1c-7144ef66eb86.jsonl
+captured_at: 2026-06-04T22:16:05+09:00
+full_pytest: not run
+sanitized_paths: true
+
+Scope:
+- issue #17 local acceptance coverage for diff and file-tree crushers
+- no SaaS, control-plane, billing, dashboard, deployment, Redis, or coding-agent-bridge changes
+- raw Codex JSONL transcript was not committed
+
+Quality gate summary:
+- tests/test_diff_file_tree_crusher_acceptance.py: 14 passed
+- tests/test_ccr_tool_injection.py: 57 passed
+- tests/test_proxy_ccr.py: 30 passed
+- tests/test_log_crusher_acceptance.py: 8 passed
+- Diff/content focused subset: 88 passed
+- ContentRouter targeted subset: 3 passed
+- ruff check headroom tests: passed
+- ruff format --check headroom tests: passed
+- git diff --check: passed
+- npm exec fumadocs-mdx: passed
+
+Primary command:
+python -m pytest tests/test_diff_file_tree_crusher_acceptance.py
+
+Representative accepted test evidence:
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_crusher_preserves_edit_target_evidence[python_package.diff] PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_crusher_preserves_edit_target_evidence[typescript_react.diff] PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_crusher_preserves_edit_target_evidence[rust_crate.diff] PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_crusher_preserves_edit_target_evidence[large_noisy.diff] PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_crusher_preserves_edit_target_evidence[rename_delete_add.diff] PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_crusher_collapses_excessive_context_without_losing_targets[large_noisy.diff] PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_diff_ccr_marker_is_parseable_injectable_and_retrievable PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_large_noisy_diff_keeps_meaningful_source_change_and_compresses PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_file_tree_detector_recognizes_repository_tree PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_file_tree_crusher_preserves_repo_shape_and_collapses_generated_noise PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_file_tree_ccr_marker_is_parseable_injectable_and_retrievable PASSED
+tests/test_diff_file_tree_crusher_acceptance.py::test_content_router_uses_file_tree_compressor_for_repository_tree PASSED
+
+Acceptance coverage retained:
+- diff fixtures covered Python package, TypeScript/React, Rust crate, noisy diff, rename/delete/add cases
+- diff crusher preserved file paths, status lines, hunk headers, changed symbols, imports, and test impact hints
+- file-tree crusher preserved package roots, source/test shape, config/build files, and recently referenced paths
+- omitted diff/tree content remained retrievable through local CCR marker parsing, injection, and store lookup
+- FileTreeCompressor local CCR marker/store persistence was covered
+- DiffCompressor explicit_hash mirroring into the Python CompressionStore was preserved
+- ContentRouter deterministic precheck for FILE_TREE and SOURCE_CODE was accepted as a local stability fix for targeted routes
+
+Full pytest was not run for this validation log.

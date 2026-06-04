@@ -1,0 +1,67 @@
+H007 validation log
+title: local provenance ledger emitter
+commit: 25b7fbd3a8cd12557fe7dda50491fb312017b463
+captured_at: 2026-06-04T22:16:05+09:00
+full_pytest: not run
+sanitized_paths: true
+
+Scope:
+- local provenance ledger emitter for coding-agent compression decisions and CCR retrieve events
+- no hosted bridge, SaaS tenant policy, control-plane, billing, dashboard, deployment, Redis, or coding-agent-bridge changes
+- raw Codex JSONL transcript was not committed
+
+Quality gate summary:
+- tests/test_provenance_ledger_emitter.py: 12 passed
+- tests/test_coding_agent_presets.py: 12 passed
+- tests/test_log_crusher_acceptance.py: 8 passed
+- tests/test_diff_file_tree_crusher_acceptance.py: 14 passed
+- tests/test_ccr_tool_injection.py: 57 passed
+- tests/test_proxy_ccr.py: 30 passed
+- telemetry focused subset: 103 passed
+- MCP registry ledger subset: 4 passed
+- compression store / SQLite subset: 89 passed
+- cache backend subset: 28 passed
+- ruff check headroom tests: passed
+- ruff format --check headroom tests: passed
+- git diff --check: passed
+- npm exec fumadocs-mdx: passed
+
+Primary command:
+python -m pytest tests/test_provenance_ledger_emitter.py
+
+Representative accepted test evidence:
+tests/test_provenance_ledger_emitter.py::test_ledger_event_serializes_required_local_fields PASSED
+tests/test_provenance_ledger_emitter.py::test_env_defaults_fill_project_session_and_deployment PASSED
+tests/test_provenance_ledger_emitter.py::test_jsonl_emitter_writes_one_event_per_line PASSED
+tests/test_provenance_ledger_emitter.py::test_jsonl_emitter_appends_multiple_events PASSED
+tests/test_provenance_ledger_emitter.py::test_otel_attributes_use_bridge_namespace PASSED
+tests/test_provenance_ledger_emitter.py::test_no_kuchino_identifiers_in_telemetry_code PASSED
+tests/test_provenance_ledger_emitter.py::test_coding_agent_preset_emits_test_log_event PASSED
+tests/test_provenance_ledger_emitter.py::test_coding_agent_preset_emits_file_tree_event_with_ccr_marker PASSED
+tests/test_provenance_ledger_emitter.py::test_coding_agent_preset_emits_search_event_with_source_metadata PASSED
+tests/test_provenance_ledger_emitter.py::test_source_code_bypass_emits_bypassed_event PASSED
+tests/test_provenance_ledger_emitter.py::test_telemetry_write_failure_does_not_fail_compression PASSED
+tests/test_provenance_ledger_emitter.py::test_ccr_retrieve_emits_retrieved_event PASSED
+
+Compatibility evidence:
+- coding-agent preset acceptance stayed green
+- log crusher acceptance stayed green
+- diff/file-tree crusher acceptance stayed green
+- H001 marker parse/injection/retrieve path stayed green
+- H002 proxy CCR retrieve path stayed green
+- SQLite and cache backend subsets stayed green
+
+Acceptance coverage retained:
+- ledger events serialize required local fields
+- environment defaults fill project, session, and deployment metadata
+- JSONL emitter writes append-only records
+- OpenTelemetry attributes use bridge namespace without Kuchino identifiers
+- coding-agent preset emits compression and bypass events for key local source types
+- telemetry write failure does not fail compression
+- local CCR retrieve emits a retrieved event
+
+Issue handling note:
+- #19 and #20 were updated as local headroom progress.
+- Hosted/downstream portions were left open/out of scope where appropriate.
+
+Full pytest was not run for this validation log.
