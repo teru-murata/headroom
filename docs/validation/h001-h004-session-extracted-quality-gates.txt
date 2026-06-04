@@ -1,0 +1,429 @@
+﻿H001-H004 session-extracted quality gates
+
+Source session: rollout-2026-06-04T08-44-26-019e8fdf-c09a-7213-ae1c-7144ef66eb86.jsonl
+Extraction note: sanitized function_call/function_call_output pairs only; raw Codex JSONL transcript was not committed.
+Repo commit at extraction: b3c986853dd09b73cf027a8a9dbf671740052c5a
+Extracted at: 2026-06-04T15:18:55+09:00
+
+Sanitization:
+- repository absolute path -> <repo>
+- Codex Python runtime path -> <python-runtime>
+- helper dependency path -> <hdeps>
+- user home/session paths -> <user-home> / <codex-session>
+
+============================================================
+H001 targeted suite: CCR tool injection and marker parser
+============================================================
+call_id: call_mGxpSVRW9MKXdUDvh4XyXnxM
+call_timestamp: 2026-06-04T02:24:21.815Z
+output_timestamp: 2026-06-04T02:24:25.846Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_ccr_tool_injection.py }
+
+output:
+Exit code: 0
+Wall time: 2 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- <python-runtime>\python.exe
+cachedir: .pytest_cache
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 57 items
+
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_existing_bracket_marker_parses PASSED [  1%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_smartcrusher_angle_marker_parses PASSED [  3%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_smartcrusher_opaque_blob_marker_parses PASSED [  5%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_supported_hash_validation_matches_local_emitters PASSED [  7%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123] PASSED [  8%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123def456abc123def456abc123] PASSED [ 10%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123xyz456] PASSED [ 12%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123def456\n] PASSED [ 14%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[../abc123def456] PASSED [ 15%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[abc123def456/secret] PASSED [ 17%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_unsupported_hash_values[] PASSED [ 19%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[<<ccr:abc123def456 ../secret>>] PASSED [ 21%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[<<ccr:abc123def456,path\\secret>>] PASSED [ 22%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[<<ccr:abc123def456..secret>>] PASSED [ 24%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[[10 items compressed to 1. Retrieve more: hash=abc123def456 ../secret]] PASSED [ 26%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_rejects_malformed_marker_text[[10 items compressed to 1. Retrieve more: hash=abc123def456x]] PASSED [ 28%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerParsing::test_multiple_markers_are_returned_in_text_order PASSED [ 29%]
+tests/test_ccr_tool_injection.py::TestCCRToolDefinition::test_anthropic_format PASSED [ 31%]
+tests/test_ccr_tool_injection.py::TestCCRToolDefinition::test_openai_format PASSED [ 33%]
+tests/test_ccr_tool_injection.py::TestCCRToolDefinition::test_google_format PASSED [ 35%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_for_markers_finds_hash PASSED [ 36%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_for_smartcrusher_angle_marker_finds_hash PASSED [ 38%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_for_markers_multiple_hashes PASSED [ 40%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_no_duplicates PASSED [ 42%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_scan_anthropic_content_blocks PASSED [ 43%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_tool_when_compression_detected PASSED [ 45%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_tool_when_smartcrusher_marker_detected PASSED [ 47%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_tool_adds_to_existing PASSED [ 49%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_skip_injection_if_tool_present_anthropic PASSED [ 50%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_skip_injection_if_tool_present_openai PASSED [ 52%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_no_injection_without_compression PASSED [ 54%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_inject_system_instructions PASSED [ 56%]
+tests/test_ccr_tool_injection.py::TestCCRToolInjector::test_process_request_full_flow PASSED [ 57%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_anthropic_format PASSED [ 59%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_openai_format PASSED [ 61%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_non_ccr_tool PASSED [ 63%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_malformed_openai_args PASSED [ 64%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_accepts_smartcrusher_hash PASSED [ 66%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_accepts_smartcrusher_marker_text PASSED [ 68%]
+tests/test_ccr_tool_injection.py::TestParseToolCall::test_parse_accepts_bracket_marker_text PASSED [ 70%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_short_hash PASSED [ 71%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_long_hash PASSED [ 73%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_non_hex_characters PASSED [ 75%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_path_traversal_marker PASSED [ 77%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_rejects_hash_with_whitespace PASSED [ 78%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_accepts_valid_24_char_hash PASSED [ 80%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_accepts_valid_12_char_hash PASSED [ 82%]
+tests/test_ccr_tool_injection.py::TestHashSecurityValidation::test_accepts_uppercase_hex PASSED [ 84%]
+tests/test_ccr_tool_injection.py::TestSystemInstructions::test_create_instructions_single_hash PASSED [ 85%]
+tests/test_ccr_tool_injection.py::TestSystemInstructions::test_create_instructions_multiple_hashes PASSED [ 87%]
+tests/test_ccr_tool_injection.py::TestSystemInstructions::test_create_instructions_truncates_many_hashes PASSED [ 89%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_textcompressor_format PASSED [ 91%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_searchcompressor_format PASSED [ 92%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_mixed_compressor_formats PASSED [ 94%]
+tests/test_ccr_tool_injection.py::TestAlternativeMarkerFormats::test_generic_compressed_marker PASSED [ 96%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerRetrieveIntegration::test_existing_bracket_marker_tool_call_resolves_store_entry PASSED [ 98%]
+tests/test_ccr_tool_injection.py::TestCCRMarkerRetrieveIntegration::test_smartcrusher_marker_end_to_end_resolves_store_entry PASSED [100%]
+
+============================= 57 passed in 0.56s ==============================
+
+============================================================
+H002 targeted suite: proxy CCR retrieve
+============================================================
+call_id: call_NHrjAQR2YMOQT22cBaa5kMYW
+call_timestamp: 2026-06-04T02:24:21.814Z
+output_timestamp: 2026-06-04T02:24:25.846Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_proxy_ccr.py }
+
+output:
+Exit code: 0
+Wall time: 4 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- <python-runtime>\python.exe
+cachedir: .pytest_cache
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 30 items
+
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_requires_hash PASSED [  3%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_nonexistent_hash PASSED [  6%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_rejects_malformed_hash PASSED [ 10%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_full_content PASSED [ 13%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_marker_text_uses_shared_compression_store PASSED [ 16%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_smartcrusher_marker_text PASSED [ 20%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_with_search PASSED [ 23%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_with_search_plain_text_original PASSED [ 26%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_with_search_nonexistent_hash_returns_404 PASSED [ 30%]
+tests/test_proxy_ccr.py::TestCCRRetrieveEndpoint::test_retrieve_increments_count PASSED [ 33%]
+tests/test_proxy_ccr.py::TestCCRRetrieveGetEndpoint::test_get_retrieve_full PASSED [ 36%]
+tests/test_proxy_ccr.py::TestCCRRetrieveGetEndpoint::test_get_retrieve_with_query PASSED [ 40%]
+tests/test_proxy_ccr.py::TestCCRRetrieveGetEndpoint::test_get_retrieve_with_query_plain_text_original PASSED [ 43%]
+tests/test_proxy_ccr.py::TestCCRRetrieveGetEndpoint::test_get_retrieve_nonexistent PASSED [ 46%]
+tests/test_proxy_ccr.py::TestCCRStatsEndpoint::test_stats_empty_store PASSED [ 50%]
+tests/test_proxy_ccr.py::TestCCRStatsEndpoint::test_stats_with_entries PASSED [ 53%]
+tests/test_proxy_ccr.py::TestCCRStatsEndpoint::test_stats_tracks_retrievals PASSED [ 56%]
+tests/test_proxy_ccr.py::TestCCRLoopbackGuard::test_post_retrieve_returns_404_for_non_loopback PASSED [ 60%]
+tests/test_proxy_ccr.py::TestCCRLoopbackGuard::test_get_retrieve_returns_404_for_non_loopback PASSED [ 63%]
+tests/test_proxy_ccr.py::TestCCRLoopbackGuard::test_tool_call_retrieve_returns_404_for_non_loopback PASSED [ 66%]
+tests/test_proxy_ccr.py::TestCCRLoopbackGuard::test_retrieve_stats_returns_404_for_non_loopback PASSED [ 70%]
+tests/test_proxy_ccr.py::TestCCRIntegration::test_health_endpoint PASSED [ 73%]
+tests/test_proxy_ccr.py::TestCCRIntegration::test_stats_endpoint PASSED  [ 76%]
+tests/test_proxy_ccr.py::TestCCREdgeCases::test_retrieve_empty_content PASSED [ 80%]
+tests/test_proxy_ccr.py::TestCCREdgeCases::test_retrieve_large_content PASSED [ 83%]
+tests/test_proxy_ccr.py::TestCCREdgeCases::test_search_no_matches PASSED [ 86%]
+tests/test_proxy_ccr.py::TestCCREdgeCases::test_unicode_content PASSED   [ 90%]
+tests/test_proxy_ccr.py::TestEndToEndTOINIntegration::test_pipeline_compresses_tool_output_and_records_toin PASSED [ 93%]
+tests/test_proxy_ccr.py::TestEndToEndTOINIntegration::test_retrieval_through_proxy_updates_toin_field_semantics PASSED [ 96%]
+tests/test_proxy_ccr.py::TestEndToEndTOINIntegration::test_full_proxy_ccr_feedback_loop PASSED [100%]
+
+============================== warnings summary ===============================
+<python-runtime>\Lib\site-packages\fastapi\testclient.py:1
+  <python-runtime>\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_proxy_ccr.py::TestEndToEndTOINIntegration::test_pipeline_compresses_tool_output_and_records_toin
+  <repo>\headroom\transforms\pipeline.py:159: UserWarning: AnthropicProvider: No client provided, using tiktoken approximation. For accurate counting, pass an Anthropic client: AnthropicProvider(client=Anthropic())
+    tokenizer = self._get_tokenizer(model)
+
+tests/test_proxy_ccr.py::TestEndToEndTOINIntegration::test_full_proxy_ccr_feedback_loop
+  <repo>\tests\test_proxy_ccr.py:807: DeprecationWarning: ToolIntelligenceNetwork.get_recommendation() is deprecated and now returns None. PR-B5 retired the request-time hint API; recommendations come from recommendations.toml at startup. See headroom/telemetry/toin.py module docstring.
+    assert fresh_toin.get_recommendation(signature, "find category") is None
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 30 passed, 3 warnings in 2.45s ========================
+
+============================================================
+H003 targeted suite: SQLite CCR backend
+============================================================
+call_id: call_WWi3lezwt7d6KQGqQNg27QRZ
+call_timestamp: 2026-06-04T02:24:21.671Z
+output_timestamp: 2026-06-04T02:24:24.498Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_ccr_sqlite_backend.py }
+
+output:
+Exit code: 0
+Wall time: 2.8 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- <python-runtime>\python.exe
+cachedir: .pytest_cache
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/test_ccr_sqlite_backend.py::test_sqlite_backend_stores_and_retrieves_value PASSED [ 12%]
+tests/test_ccr_sqlite_backend.py::test_sqlite_backend_survives_restart PASSED [ 25%]
+tests/test_ccr_sqlite_backend.py::test_sqlite_backend_ttl_expiry_deletes_on_retrieve PASSED [ 37%]
+tests/test_ccr_sqlite_backend.py::test_sqlite_backend_cleanup_expired_removes_rows PASSED [ 50%]
+tests/test_ccr_sqlite_backend.py::test_sqlite_backend_multiple_instances_share_db PASSED [ 62%]
+tests/test_ccr_sqlite_backend.py::test_sqlite_store_normalizes_markers_and_rejects_malformed_keys PASSED [ 75%]
+tests/test_ccr_sqlite_backend.py::test_env_selects_sqlite_backend_and_ttl PASSED [ 87%]
+tests/test_ccr_sqlite_backend.py::test_proxy_retrieve_works_with_sqlite_backend PASSED [100%]
+
+============================== warnings summary ===============================
+<python-runtime>\Lib\site-packages\fastapi\testclient.py:1
+  <python-runtime>\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 8 passed, 1 warning in 1.13s =========================
+
+============================================================
+H004 targeted suite: log crusher acceptance
+============================================================
+call_id: call_wMIABg08LxrLJN4dxCRq8yHp
+call_timestamp: 2026-06-04T05:25:57.290Z
+output_timestamp: 2026-06-04T05:25:59.952Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_log_crusher_acceptance.py -q }
+
+output:
+Exit code: 0
+Wall time: 2.6 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 8 items
+
+tests\test_log_crusher_acceptance.py ........                            [100%]
+
+============================== 8 passed in 0.69s ==============================
+
+============================================================
+H004 related suite: log compressor
+============================================================
+call_id: call_KRmlFWXWmnO55UUJzLo1y5DK
+call_timestamp: 2026-06-04T05:17:59.530Z
+output_timestamp: 2026-06-04T05:18:02.702Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_log_compressor.py -q }
+
+output:
+Exit code: 0
+Wall time: 3.2 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 46 items
+
+tests\test_log_compressor.py ........................................... [ 93%]
+...                                                                      [100%]
+
+============================= 46 passed in 1.39s ==============================
+
+============================================================
+H004 related suite: transform/text log compressor subset
+============================================================
+call_id: call_IDz7iXSQIQGGyQPHo0eVGyAh
+call_timestamp: 2026-06-04T05:17:59.669Z
+output_timestamp: 2026-06-04T05:18:02.702Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_transforms_log_compressor.py tests/test_text_compressors.py::TestLogCompressor -q }
+
+output:
+Exit code: 0
+Wall time: 2.5 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 7 items
+
+tests\test_transforms_log_compressor.py ....                             [ 57%]
+tests\test_text_compressors.py ...                                       [100%]
+
+============================== 7 passed in 0.67s ==============================
+
+============================================================
+H004 related suite: content router
+============================================================
+call_id: call_0iN1Hg6hePLJiK3t5bxF44Zp
+call_timestamp: 2026-06-04T05:18:31.495Z
+output_timestamp: 2026-06-04T05:18:33.191Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& { $env:PYTHONPATH='<hdeps>'; $env:PYTHONUTF8='1'; $env:PYTHONIOENCODING='utf-8'; <hdeps>\bin\pytest.exe tests/test_transforms_content_router.py -q }
+
+output:
+Exit code: 0
+Wall time: 1.7 seconds
+Output:
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 18 items
+
+tests\test_transforms_content_router.py ..................               [100%]
+
+============================= 18 passed in 0.24s ==============================
+
+============================================================
+Quality gate: ruff check
+============================================================
+call_id: call_61QodGSyst87j9CFtF3gdKC6
+call_timestamp: 2026-06-04T05:25:57.434Z
+output_timestamp: 2026-06-04T05:25:59.952Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& '<python-runtime>\python.exe' -m ruff check headroom tests
+
+output:
+Exit code: 0
+Wall time: 1.1 seconds
+Output:
+All checks passed!
+
+============================================================
+Quality gate: ruff format check
+============================================================
+call_id: call_qHls17swfJkK6NgUoAEnadyD
+call_timestamp: 2026-06-04T05:25:57.435Z
+output_timestamp: 2026-06-04T05:25:59.952Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+& '<python-runtime>\python.exe' -m ruff format --check headroom tests
+
+output:
+Exit code: 0
+Wall time: 1.1 seconds
+Output:
+704 files already formatted
+warning: Failed to write cache file `<repo>\.ruff_cache\0.15.15\11704818874966118955`: Access is denied. (os error 5)
+
+============================================================
+Quality gate: git diff whitespace check
+============================================================
+call_id: call_lDtrI8we5BLNdkf0va2i9XNm
+call_timestamp: 2026-06-04T05:25:57.435Z
+output_timestamp: 2026-06-04T05:25:59.952Z
+workdir: <repo>
+timeout_ms: 120000
+command:
+git diff --check
+
+output:
+Exit code: 0
+Wall time: 1 seconds
+Output:
+warning: in the working copy of 'docs/content/docs/text-and-logs.mdx', LF will be replaced by CRLF the next time Git touches it
+
+============================================================
+Docs gate: fumadocs-mdx
+============================================================
+call_id: call_i1a2PJKJljz6nZi9Jqi7Hfmq
+call_timestamp: 2026-06-04T06:04:40.429Z
+output_timestamp: 2026-06-04T06:04:42.806Z
+workdir: <repo>\docs
+timeout_ms: 120000
+command:
+npm exec fumadocs-mdx
+
+output:
+Exit code: 0
+Wall time: 2.4 seconds
+Output:
+[MDX] generated files in 8.790400000000034ms
+
+============================================================
+Docs gate: types check attempt
+============================================================
+call_id: call_fyk0yStmXsNiALGf8VdECA1t
+call_timestamp: 2026-06-04T06:03:42.881Z
+output_timestamp: 2026-06-04T06:03:47.717Z
+workdir: <repo>\docs
+timeout_ms: 300000
+command:
+npm run types:check
+
+output:
+Exit code: 1
+Wall time: 4.8 seconds
+Output:
+
+> headroom-docs@0.0.0 types:check
+> fumadocs-mdx && next typegen && tsc --noEmit
+
+[MDX] generated files in 8.33239999999995ms
+Generating route types...
+[MDX] generated files in 10.480699999999956ms
+âœ“ Types generated successfully
+app/(home)/layout.tsx(2,29): error TS2307: Cannot find module '@/lib/layout.shared' or its corresponding type declarations.
+app/api/search/route.ts(1,24): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/docs/[[...slug]]/page.tsx(1,58): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/docs/[[...slug]]/page.tsx(14,27): error TS2307: Cannot find module '@/lib/shared' or its corresponding type declarations.
+app/docs/layout.tsx(1,24): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/docs/layout.tsx(3,29): error TS2307: Cannot find module '@/lib/layout.shared' or its corresponding type declarations.
+app/llms-full.txt/route.ts(1,36): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/llms.mdx/docs/[[...slug]]/route.ts(1,56): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/llms.mdx/docs/[[...slug]]/route.ts(19,33): error TS7006: Parameter 'page' implicitly has an 'any' type.
+app/llms.txt/route.ts(1,24): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/og/docs/[...slug]/route.tsx(1,38): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/og/docs/[...slug]/route.tsx(23,33): error TS7006: Parameter 'page' implicitly has an 'any' type.
+app/sitemap.ts(10,24): error TS2307: Cannot find module '@/lib/source' or its corresponding type declarations.
+app/sitemap.ts(31,66): error TS7006: Parameter 'page' implicitly has an 'any' type.
+components/button.tsx(4,20): error TS2307: Cannot find module '@/lib/cn' or its corresponding type declarations.
+components/community-stats-header.tsx(1,53): error TS2307: Cannot find module '@/lib/telemetry' or its corresponding type declarations.
+components/live-stats.tsx(2,53): error TS2307: Cannot find module '@/lib/telemetry' or its corresponding type declarations.
+proxy.ts(3,45): error TS2307: Cannot find module '@/lib/shared' or its corresponding type declarations.
