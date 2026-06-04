@@ -1,0 +1,30 @@
+﻿H004 validation log
+title: build/test log crusher acceptance
+commit: 299202f934acf628fba7899e45ddd525aee9b9a6
+captured_at: 2026-06-04T15:02:41+09:00
+command: python -m pytest tests/test_log_crusher_acceptance.py
+full_pytest: not run
+sanitized_paths: true
+
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- <python-runtime>\python.exe
+cachedir: .pytest_cache
+rootdir: <repo>
+configfile: pyproject.toml
+plugins: anyio-4.13.0, asyncio-1.4.0, timeout-2.4.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 8 items
+
+tests/test_log_crusher_acceptance.py::test_log_crusher_preserves_failure_evidence_and_collapses_noise[pytest_failure.txt] PASSED [ 12%]
+tests/test_log_crusher_acceptance.py::test_log_crusher_preserves_failure_evidence_and_collapses_noise[vitest_failure.txt] PASSED [ 25%]
+tests/test_log_crusher_acceptance.py::test_log_crusher_preserves_failure_evidence_and_collapses_noise[cargo_failure.txt] PASSED [ 37%]
+tests/test_log_crusher_acceptance.py::test_log_crusher_preserves_failure_evidence_and_collapses_noise[go_test_failure.txt] PASSED [ 50%]
+tests/test_log_crusher_acceptance.py::test_log_crusher_preserves_failure_evidence_and_collapses_noise[maven_failure.txt] PASSED [ 62%]
+tests/test_log_crusher_acceptance.py::test_log_crusher_preserves_failure_evidence_and_collapses_noise[noisy_install_build.txt] PASSED [ 75%]
+tests/test_log_crusher_acceptance.py::test_fixture_contract_catches_missing_critical_failure_line PASSED [ 87%]
+tests/test_log_crusher_acceptance.py::test_log_ccr_marker_is_parseable_injectable_and_retrievable PASSED [100%]
+
+============================== 8 passed in 0.61s ==============================
+
+exit_code: 0
+Full pytest was not run for this validation log.

@@ -1,0 +1,211 @@
+---
+title: Acceptance Evidence
+description: Local acceptance coverage for the CCR marker, retrieve, SQLite backend, and build/test log crusher work.
+---
+
+This page records the local acceptance evidence behind the current Headroom CCR
+and log-compression changes. It is intentionally scoped to the local Headroom
+repository. It does not define hosted/team retrieve authorization, SaaS marker
+signing, Redis/Valkey deployment policy, billing, dashboards, or a control plane.
+
+The raw pytest logs are checked into `docs/validation/` so reviewers can inspect
+the exact tests that ran. Those logs are path-sanitized: local machine paths are
+replaced with `<repo>` or `<python-runtime>`.
+
+| Work item | Local scope | Primary implementation surface | Validation log |
+|---|---|---|---|
+| H001 | CCR marker parsing and tool injection | `headroom/ccr/markers.py`, `headroom/ccr/tool_injection.py`, local retrieve tool parsing | [h001-ccr-marker-parser.txt](https://github.com/teru-murata/headroom/blob/main/docs/validation/h001-ccr-marker-parser.txt) |
+| H002 | Proxy CCR retrieve visibility | `headroom/proxy/server.py`, proxy retrieve handlers, shared compression store visibility | [h002-proxy-ccr-retrieve.txt](https://github.com/teru-murata/headroom/blob/main/docs/validation/h002-proxy-ccr-retrieve.txt) |
+| H003 | Local SQLite CCR backend | `headroom/cache/backends/sqlite.py`, `headroom/cache/compression_store.py`, proxy SQLite integration | [h003-sqlite-ccr-backend.txt](https://github.com/teru-murata/headroom/blob/main/docs/validation/h003-sqlite-ccr-backend.txt) |
+| H004 | Build/test log crusher acceptance | `headroom/transforms/log_compressor.py`, log acceptance fixtures, CCR retrievability for omitted log originals | [h004-log-crusher-acceptance.txt](https://github.com/teru-murata/headroom/blob/main/docs/validation/h004-log-crusher-acceptance.txt) |
+
+## H001: CCR marker parser
+
+H001 made Headroom's local CCR marker behavior internally consistent. Before
+this work, different local components emitted different marker families:
+
+```text
+[N items compressed to M. Retrieve more: hash=...]
+<<ccr:HASH ...>>
+```
+
+The first form came from bracket-style retrieve markers. The second form came
+from SmartCrusher row-drop and opaque-blob paths. H001 centralized parsing so
+both forms are recognized by the local CCR flow.
+
+### Behavior covered
+
+| Contract | Evidence |
+|---|---|
+| Existing bracket retrieve markers still parse | `TestCCRMarkerParsing::test_existing_bracket_marker_parses` |
+| SmartCrusher `<<ccr:...>>` markers parse | `test_smartcrusher_angle_marker_parses`, `test_smartcrusher_opaque_blob_marker_parses` |
+| Multiple marker families are deterministic | `test_multiple_markers_are_returned_in_text_order` |
+| CCRToolInjector detects both families | `test_scan_for_markers_finds_hash`, `test_scan_for_smartcrusher_angle_marker_finds_hash` |
+| Tool call parsing accepts raw hash, bracket marker, and angle marker text | `TestParseToolCall` cases |
+| Malformed hashes and unsafe marker metadata are rejected | `TestHashSecurityValidation` and malformed-marker parser cases |
+| SmartCrusher marker text can resolve through the local compression store | `test_smartcrusher_marker_end_to_end_resolves_store_entry` |
+
+### Local hash grammar
+
+The local parser accepts the hash forms emitted by local Headroom producers:
+
+| Producer | Hash shape |
+|---|---|
+| SmartCrusher row-drop / opaque marker path | 12 hex characters |
+| Python compression store / Rust live-zone CCR keys | 24 hex characters |
+
+The parser rejects whitespace, path traversal, path separators, unsupported
+lengths, non-hex characters, and marker metadata with unsafe path-like content.
+This is local validation only. Hosted signed marker policy belongs outside this
+repository.
+
+## H002: Proxy retrieve visibility
+
+H002 fixed local proxy `/v1/retrieve` behavior so a locally stored CCR entry is
+visible to the retrieve endpoint that is allowed to serve it.
+
+The important bug class was store visibility: compression could write to one
+store/backend while the proxy retrieve route looked in another. H002 made proxy
+retrieve lookup normalize raw hashes and full marker text through the shared
+CCR parser, and kept the route on the same local store visibility path used by
+compression.
+
+### Behavior covered
+
+| Contract | Evidence |
+|---|---|
+| Missing valid hash returns controlled not-found | `test_retrieve_nonexistent_hash` |
+| Malformed hash/marker is rejected | `test_retrieve_rejects_malformed_hash` |
+| Raw hash retrieve returns original content | `test_retrieve_full_content` |
+| Full bracket marker text resolves through shared store lookup | `test_retrieve_marker_text_uses_shared_compression_store` |
+| SmartCrusher angle marker text resolves through proxy lookup | `test_retrieve_smartcrusher_marker_text` |
+| GET and POST retrieve paths both work locally | `TestCCRRetrieveEndpoint`, `TestCCRRetrieveGetEndpoint` |
+| Non-loopback retrieve requests remain unavailable | `TestCCRLoopbackGuard` |
+| TOIN integration no longer gets a dangling `/v1/retrieve` 404 for reachable entries | `TestEndToEndTOINIntegration` cases |
+
+### Safety boundary
+
+The retrieve endpoints can expose cached originals, so the local guard remains
+part of the contract. Binding the proxy on a public interface does not make
+`/v1/retrieve*` available to non-loopback clients. Shared remote proxy mode
+still needs an explicit authorization and namespace policy.
+
+## H003: Local SQLite CCR backend
+
+H003 added Headroom's first-party local SQLite backend for CCR entries. The
+default backend remains in-memory. SQLite is available when a local single-host
+workflow needs restart survival without external services.
+
+### Configuration
+
+```bash
+HEADROOM_CCR_BACKEND=sqlite
+HEADROOM_CCR_SQLITE_PATH=/path/to/headroom-ccr.sqlite
+HEADROOM_CCR_TTL_SECONDS=300
+```
+
+`HEADROOM_CCR_BACKEND=sqlite` selects the built-in SQLite backend.
+`HEADROOM_CCR_SQLITE_PATH` controls the local database path. The TTL env var
+overrides the default store TTL.
+
+### Behavior covered
+
+| Contract | Evidence |
+|---|---|
+| SQLite stores and retrieves CCR originals | `test_sqlite_backend_stores_and_retrieves_value` |
+| Entries survive backend/process-style restart | `test_sqlite_backend_survives_restart` |
+| Expired entries are not returned | `test_sqlite_backend_ttl_expiry_deletes_on_retrieve` |
+| `cleanup_expired` removes expired rows | `test_sqlite_backend_cleanup_expired_removes_rows` |
+| Multiple backend instances can share one DB file | `test_sqlite_backend_multiple_instances_share_file` |
+| Marker/hash normalization is reused | `test_sqlite_store_normalizes_markers_and_rejects_malformed_keys` |
+| Environment selection wires SQLite into the global store | `test_get_compression_store_uses_sqlite_backend_from_env` |
+| Proxy retrieve works with SQLite configured | `test_proxy_retrieve_works_with_sqlite_backend` |
+
+### Boundary
+
+SQLite is a local, single-host durable backend. It is not the hosted/team CCR
+profile. Redis/Valkey, tenant namespace isolation, signed remote markers, and
+remote retrieve authorization are outside this Headroom local backend.
+
+## H004: Log crusher acceptance
+
+H004 added acceptance fixtures for build/test logs and hardened
+`LogCompressor` so coding-agent failure evidence survives compression.
+
+The compressor should aggressively collapse passing noise, repeated downloads,
+and progress chatter. It must not remove the evidence a coding agent needs to
+continue work after a failed command.
+
+### Fixture corpus
+
+The acceptance fixtures live under `tests/fixtures/log_crusher/`:
+
+| Fixture | Scenario | Required evidence |
+|---|---|---|
+| `pytest_failure.txt` | Python test failure | command, failed pytest node id, `AssertionError`, `tests/test_checkout.py:42`, exit code |
+| `vitest_failure.txt` | Vitest test failure | command, failing test title, assertion message, `src/cart.test.ts:88:21`, exit code |
+| `cargo_failure.txt` | Rust cargo test failure | command, failed test, panic line, `crates/checkout/src/lib.rs:128:9`, exit code |
+| `go_test_failure.txt` | Go test failure | command, `--- FAIL`, `retry/retry_test.go:87`, assertion-style message, exit code |
+| `maven_failure.txt` | Maven/Surefire failure | command, failing Java test, Surefire diagnostic, build failure, exit code |
+| `noisy_install_build.txt` | Noisy install/build failure | command, TypeScript diagnostic, source context line, root build error, exit code |
+
+### Behavior covered
+
+| Contract | Evidence |
+|---|---|
+| Required evidence is present in each fixture before compression | `test_fixture_contract_catches_missing_critical_failure_line` |
+| Compression keeps command, exit code, failed name, diagnostics, and file/line references | `test_log_crusher_preserves_failure_evidence_and_collapses_noise` |
+| Passing test output and download chatter are reduced | same fixture-parametrized acceptance test |
+| Evidence guard metadata is exposed in local stats | `evidence_guard_*` assertions |
+| CCR marker emitted by a log compressor is parseable | `test_log_ccr_marker_is_parseable_injectable_and_retrievable` |
+| CCRToolInjector detects the emitted marker | same retrieve integration test |
+| The omitted original log can be retrieved from the local compression store | same retrieve integration test |
+
+### Evidence guard
+
+The Python shim now checks the Rust-compressed output for coding-agent evidence
+lines. If the Rust selection dropped an essential line, the shim adds that line
+back while preserving any trailing CCR marker. The guard is deliberately narrow:
+it does not keep every generic `ERROR:` line, because that would defeat
+`max_errors` and `max_total_lines`. It targets the evidence required to continue
+a failed implementation task.
+
+The local stats include:
+
+| Stat | Meaning |
+|---|---|
+| `evidence_guard_required` | The original log contained evidence lines that should survive |
+| `evidence_guard_candidates` | Count of unique candidate evidence lines inspected |
+| `evidence_guard_added` | Number of evidence lines restored to compressed output |
+| `evidence_guard_missing_after_guard` | Remaining missing evidence after the guard; acceptance expects zero |
+
+These stats are local transform metadata. The token provenance / accuracy
+ledger work is tracked separately; once a ledger hook exists, this guard
+metadata can feed that ledger.
+
+## Validation command summary
+
+The checked-in validation logs record the exact pytest output for these targeted
+suites:
+
+```bash
+python -m pytest tests/test_ccr_tool_injection.py
+python -m pytest tests/test_proxy_ccr.py
+python -m pytest tests/test_ccr_sqlite_backend.py
+python -m pytest tests/test_log_crusher_acceptance.py
+```
+
+Additional H004 validation also covered:
+
+```bash
+python -m pytest tests/test_log_compressor.py
+python -m pytest tests/test_transforms_log_compressor.py tests/test_text_compressors.py::TestLogCompressor
+python -m pytest tests/test_transforms_content_router.py
+ruff check headroom tests
+ruff format --check headroom tests
+git diff --check
+```
+
+Full `python -m pytest` was not run for these local validation logs. One broader
+content-router focused path timed out in this Windows environment; the completed
+targeted suites above are the evidence recorded for H001-H004.

@@ -9,6 +9,8 @@ Headroom's CCR (Compress-Cache-Retrieve) architecture makes compression **retrie
   The default CCR backend is in-memory with a default 5 minute TTL. It is process-local and does not survive restarts. Headroom also ships a local SQLite backend for single-host restart survival. Hosted/team Redis or Valkey profiles belong to coding-agent-bridge and are not implemented in this repository.
 </Callout>
 
+For implementation-level acceptance coverage, see [Acceptance Evidence](/docs/acceptance-evidence).
+
 ## The problem with traditional compression
 
 Traditional compression forces a difficult tradeoff:
@@ -46,6 +48,33 @@ When SmartCrusher compresses tool output:
 [1000 items compressed to 20. Retrieve more: hash=abc123]
 ```
 
+### Local marker forms
+
+Headroom's local CCR parser recognizes both local marker families that are
+currently emitted inside this repository:
+
+```text
+[1000 items compressed to 20. Retrieve more: hash=abc123def456abc123def456]
+<<ccr:89f81e97033e 15_rows_offloaded>>
+```
+
+The bracket form is used by existing retrieve markers such as text, search, log,
+and generic compression summaries. The `<<ccr:...>>` form is used by
+SmartCrusher row-drop and opaque-blob paths. Both marker families normalize to a
+local hash before store lookup or retrieve-tool parsing.
+
+The local hash grammar is explicit:
+
+| Hash form | Local producer |
+|---|---|
+| 12 hex characters | SmartCrusher row-drop / opaque-blob markers |
+| 24 hex characters | Python compression store and Rust CCR-emitting transform keys |
+
+Unsupported lengths, non-hex strings, whitespace, path separators, control
+characters, and path-traversal-like metadata are rejected. This validation is
+for Headroom's local hash-backed profile only; it is not a SaaS remote marker
+authorization policy.
+
 ### Storage guarantees
 
 | Backend | Shipped status | Retention behavior | Notes |
@@ -56,6 +85,22 @@ When SmartCrusher compresses tool output:
 | Redis / Valkey | Not implemented in Headroom | Hosted/team profile is out of scope here | Remote namespace, authorization, and signed marker policy belong to coding-agent-bridge. |
 
 For local development, the default in-memory store is enough to let the model recover recently omitted content. For restart survival on one local host, use SQLite. Multi-worker/team proxy deployments still need explicit namespace and authorization policy; this local SQLite backend does not define SaaS remote retrieve authorization.
+
+### SQLite local backend details
+
+The SQLite backend is selected with:
+
+```bash
+HEADROOM_CCR_BACKEND=sqlite
+HEADROOM_CCR_SQLITE_PATH=/path/to/headroom-ccr.sqlite
+HEADROOM_CCR_TTL_SECONDS=300
+```
+
+It creates its schema automatically, stores CCR entries by normalized local hash,
+uses TTL fields to prevent expired entries from being returned, and supports
+cleanup of expired rows. Multiple local backend instances can open the same file
+and observe each other's writes. This is sufficient for local single-host
+restart survival; it is not distributed storage.
 
 ## Phase 2: Tool Injection
 

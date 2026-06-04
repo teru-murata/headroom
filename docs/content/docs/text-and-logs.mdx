@@ -97,6 +97,36 @@ When CCR is enabled and the log is large enough to emit a retrieve marker, the
 omitted original remains retrievable through Headroom's local CCR store while
 the entry is available.
 
+### Coding-agent failure evidence
+
+For coding agents, a compressed test/build log is only useful if the next step
+is still obvious. `LogCompressor` therefore preserves the concrete failure
+evidence needed to continue an implementation task:
+
+| Evidence | Examples |
+|---|---|
+| Original command | `$ python -m pytest tests/test_checkout.py::test_discount_rounding -q` |
+| Exit code | `exit code: 1`, `exit code: 101`, `exit code: 2` |
+| Failed test name | `FAILED tests/test_checkout.py::test_discount_rounding`, `--- FAIL: TestRetryBackoff` |
+| Assertion/root-cause message | `AssertionError`, `expected delay 200ms, got 20ms`, `error TS2345` |
+| File and line reference | `tests/test_checkout.py:42`, `src/cart.test.ts:88:21`, `crates/checkout/src/lib.rs:128:9` |
+| Build diagnostic | Maven/Surefire failure, TypeScript compiler error, cargo panic location |
+
+The compressor still collapses passing test noise, repeated dependency fetch
+lines, progress chatter, and repeated warnings where possible. It does not
+promote every generic `ERROR:` line to must-keep status, because that would
+break the configured line budget. The evidence guard targets lines that let an
+agent identify the failed command, failed test/build target, location, and first
+root-cause diagnostic.
+
+Acceptance fixtures for pytest, Vitest, cargo, Go test, Maven, and noisy npm
+build output are checked in under `tests/fixtures/log_crusher/`. The acceptance
+tests assert both sides of the contract: critical failure evidence survives, and
+repeated passing/download noise is reduced.
+
+See [Acceptance Evidence](/docs/acceptance-evidence) for the fixture matrix and
+the checked-in validation logs.
+
 ## DiffCompressor
 
 Compresses unified diffs while keeping the actual changes and enough context to understand them.

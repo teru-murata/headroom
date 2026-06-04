@@ -15,6 +15,7 @@
     "text-and-logs",
     "---Reversible Compression---",
     "ccr",
+    "acceptance-evidence",
     "---Cache & Context---",
     "cache-optimization",
     "context-management",
