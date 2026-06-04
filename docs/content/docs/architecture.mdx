@@ -116,7 +116,7 @@ Cache:     Hash-indexed in-memory store by default (5 minute TTL)
 Retrieve:  LLM calls ccr_retrieve("abc123")  ->  original 1000 items
 ```
 
-The shipped backend is `InMemoryBackend`. It is process-local and does not survive restarts; multi-worker deployments have one CCR store per worker unless a request-scoped or third-party backend is installed. `HEADROOM_CCR_BACKEND` can load external backends through the `headroom.ccr_backend` entry point, but this repository does not currently ship first-party SQLite or Redis CCR backends.
+The default backend is `InMemoryBackend`. It is process-local and does not survive restarts; multi-worker deployments have one CCR store per worker unless a request-scoped or durable backend is installed. For local single-host restart survival, set `HEADROOM_CCR_BACKEND=sqlite`; `HEADROOM_CCR_SQLITE_PATH` can override the database path. Redis/Valkey hosted profiles, tenant authorization, and signed remote marker policy belong to coding-agent-bridge, not Headroom's local CCR backend.
 
 ## TOIN: Tool Output Intelligence Network
 

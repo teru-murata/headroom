@@ -49,6 +49,7 @@ HEADROOM_WORKSPACE_DIR_ENV = "HEADROOM_WORKSPACE_DIR"
 HEADROOM_SAVINGS_PATH_ENV = "HEADROOM_SAVINGS_PATH"
 HEADROOM_TOIN_PATH_ENV = "HEADROOM_TOIN_PATH"
 HEADROOM_SUBSCRIPTION_STATE_PATH_ENV = "HEADROOM_SUBSCRIPTION_STATE_PATH"
+HEADROOM_CCR_SQLITE_PATH_ENV = "HEADROOM_CCR_SQLITE_PATH"
 
 # ---------------------------------------------------------------------------
 # Default sub-path fragments
@@ -60,6 +61,7 @@ _CONFIG_DIR_DEFAULT_SUFFIX = "config"
 # Resource file/sub-dir names (kept here so nothing else has to hardcode them)
 _SAVINGS_FILE = "proxy_savings.json"
 _TOIN_FILE = "toin.json"
+_CCR_SQLITE_FILE = "ccr.sqlite"
 _MODELS_FILE = "models.json"
 _SUBSCRIPTION_FILE = "subscription_state.json"
 _MEMORY_DB_FILE = "memory.db"
@@ -190,6 +192,16 @@ def toin_path(explicit: str | os.PathLike[str] | None = None) -> Path:
         explicit,
         HEADROOM_TOIN_PATH_ENV,
         workspace_dir() / _TOIN_FILE,
+    )
+
+
+def ccr_sqlite_path(explicit: str | os.PathLike[str] | None = None) -> Path:
+    """Return the path for the local durable CCR SQLite database."""
+
+    return _resolve(
+        explicit,
+        HEADROOM_CCR_SQLITE_PATH_ENV,
+        workspace_dir() / _CCR_SQLITE_FILE,
     )
 
 
@@ -339,12 +351,14 @@ __all__ = [
     "HEADROOM_SAVINGS_PATH_ENV",
     "HEADROOM_TOIN_PATH_ENV",
     "HEADROOM_SUBSCRIPTION_STATE_PATH_ENV",
+    "HEADROOM_CCR_SQLITE_PATH_ENV",
     "config_dir",
     "workspace_dir",
     "ensure_config_dir",
     "ensure_workspace_dir",
     "savings_path",
     "toin_path",
+    "ccr_sqlite_path",
     "subscription_state_path",
     "memory_db_path",
     "native_memory_dir",

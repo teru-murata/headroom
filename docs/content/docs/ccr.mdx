@@ -6,7 +6,7 @@ description: Compress-Cache-Retrieve architecture that caches omitted originals 
 Headroom's CCR (Compress-Cache-Retrieve) architecture makes compression **retrievable** within the active store's retention guarantees. When content is compressed, the original data is cached locally. If the LLM needs the full data while that cache entry is still available, it can retrieve it through Headroom.
 
 <Callout type="info" title="Retrieval depends on the backing store">
-  The shipped CCR backend is in-memory with a default 5 minute TTL. It is process-local and does not survive restarts. Durable SQLite/Redis-style CCR backends are roadmap work, not shipped first-party backends in this repository.
+  The default CCR backend is in-memory with a default 5 minute TTL. It is process-local and does not survive restarts. Headroom also ships a local SQLite backend for single-host restart survival. Hosted/team Redis or Valkey profiles belong to coding-agent-bridge and are not implemented in this repository.
 </Callout>
 
 ## The problem with traditional compression
@@ -51,11 +51,11 @@ When SmartCrusher compresses tool output:
 | Backend | Shipped status | Retention behavior | Notes |
 |---|---|---|---|
 | In-memory | Shipped default | Default 5 minute TTL; process-local | Entries are lost on restart and are not shared across worker processes. |
+| SQLite | Shipped local backend | TTL-backed local rows; survives process restart | Enable with `HEADROOM_CCR_BACKEND=sqlite`; path defaults under `HEADROOM_WORKSPACE_DIR` and can be set with `HEADROOM_CCR_SQLITE_PATH`. `HEADROOM_CCR_TTL_SECONDS` overrides the default TTL. Local/single-host only. |
 | Entry-point backend | Supported extension point | Backend-defined | `HEADROOM_CCR_BACKEND` loads adapters registered under `headroom.ccr_backend`. |
-| SQLite | Roadmap / third-party only | Not guaranteed by this repo | No first-party SQLite CCR backend is currently shipped. |
-| Redis | Roadmap / third-party only | Not guaranteed by this repo | No first-party Redis CCR backend is currently shipped. |
+| Redis / Valkey | Not implemented in Headroom | Hosted/team profile is out of scope here | Remote namespace, authorization, and signed marker policy belong to coding-agent-bridge. |
 
-For local development, the default in-memory store is enough to let the model recover recently omitted content. For long-lived sessions, restart survival, or multi-worker/team proxy deployments, use or implement a durable backend and define namespace/auth policy explicitly.
+For local development, the default in-memory store is enough to let the model recover recently omitted content. For restart survival on one local host, use SQLite. Multi-worker/team proxy deployments still need explicit namespace and authorization policy; this local SQLite backend does not define SaaS remote retrieve authorization.
 
 ## Phase 2: Tool Injection
 

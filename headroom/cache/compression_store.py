@@ -80,6 +80,31 @@ def _payload_for_retrieval_log(payload: str) -> dict[str, Any]:
     }
 
 
+def _normalize_supported_ccr_hash(value: object) -> str:
+    from ..ccr.markers import normalize_ccr_hash
+
+    return normalize_ccr_hash(value)
+
+
+def _coerce_lookup_ccr_hash(value: str) -> str:
+    """Normalize supported local marker text while preserving legacy misses."""
+    try:
+        return _normalize_supported_ccr_hash(value)
+    except ValueError:
+        return value
+
+
+def _env_int(name: str) -> int | None:
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Ignoring invalid %s=%r; expected integer", name, raw)
+        return None
+
+
 @dataclass
 class CompressionEntry:
     """A cached compression entry with metadata for retrieval and feedback."""
@@ -184,6 +209,13 @@ class CompressionStore:
         # MEDIUM FIX #16: Use a min-heap for O(log n) eviction instead of O(n)
         # Heap entries are (created_at, hash_key) tuples
         self._eviction_heap: list[tuple[float, str]] = []
+        try:
+            self._eviction_heap = [
+                (entry.created_at, hash_key) for hash_key, entry in self._backend.items()
+            ]
+        except Exception:
+            logger.debug("Could not initialize CCR eviction heap from backend", exc_info=True)
+        heapq.heapify(self._eviction_heap)
         # CRITICAL FIX: Track stale entries count to know when heap cleanup is needed
         self._stale_heap_entries = 0
         # Threshold for triggering heap rebuild (when 50% are stale)
@@ -250,11 +282,13 @@ class CompressionStore:
             # — silently falling back to the default hash when the caller
             # asked for a specific key would defeat the marker/store
             # consistency we're trying to preserve.
-            if not explicit_hash or not all(c in "0123456789abcdefABCDEF" for c in explicit_hash):
+            try:
+                hash_key = _normalize_supported_ccr_hash(explicit_hash)
+            except ValueError as exc:
                 raise ValueError(
-                    f"explicit_hash must be a non-empty hex string, got {explicit_hash!r}"
-                )
-            hash_key = explicit_hash.lower()
+                    "explicit_hash must be a supported local CCR hash or marker "
+                    f"hex string, got {explicit_hash!r}"
+                ) from exc
         else:
             # SHA-256 truncated to 24 hex chars (96 bits) — same collision
             # space as the MD5[:24] this replaced. Switched from MD5 in
@@ -335,6 +369,7 @@ class CompressionStore:
         Returns:
             CompressionEntry if found and not expired, None otherwise.
         """
+        hash_key = _coerce_lookup_ccr_hash(hash_key)
         with self._lock:
             entry = self._backend.get(hash_key)
 
@@ -399,6 +434,7 @@ class CompressionStore:
         Returns:
             Dict with metadata if found and not expired, None otherwise.
         """
+        hash_key = _coerce_lookup_ccr_hash(hash_key)
         with self._lock:
             entry = self._backend.get(hash_key)
 
@@ -683,6 +719,7 @@ class CompressionStore:
         Returns:
             CompressionEntry copy if found and not expired, None otherwise.
         """
+        hash_key = _coerce_lookup_ccr_hash(hash_key)
         with self._lock:
             entry = self._backend.get(hash_key)
 
@@ -716,6 +753,7 @@ class CompressionStore:
         Returns:
             True if the entry exists and is not expired.
         """
+        hash_key = _coerce_lookup_ccr_hash(hash_key)
         with self._lock:
             entry = self._backend.get(hash_key)
             if entry is None:
@@ -822,6 +860,17 @@ class CompressionStore:
             self._eviction_heap.clear()  # MEDIUM FIX #16: Clear heap too
             self._stale_heap_entries = 0  # CRITICAL FIX: Reset stale counter
 
+    def cleanup_expired(self) -> int:
+        """Remove expired entries and return the number removed."""
+        with self._lock:
+            return self._clean_expired()
+
+    def close(self) -> None:
+        """Close backend resources when the backend exposes a close hook."""
+        close = getattr(self._backend, "close", None)
+        if callable(close):
+            close()
+
     def _evict_if_needed(self) -> None:
         """Evict old entries if at capacity. Must be called with lock held.
 
@@ -861,7 +910,7 @@ class CompressionStore:
                 if self._stale_heap_entries > 0:
                     self._stale_heap_entries -= 1
 
-    def _clean_expired(self) -> None:
+    def _clean_expired(self) -> int:
         """Remove expired entries. Must be called with lock held.
 
         CRITICAL FIX: Track stale heap entries when deleting to prevent memory leak.
@@ -872,6 +921,7 @@ class CompressionStore:
             # CRITICAL FIX: Increment stale counter - the heap still has an entry
             # for this key that will be stale when we try to evict
             self._stale_heap_entries += 1
+        return len(expired_keys)
 
     def _rebuild_heap(self) -> None:
         """Rebuild heap from current store entries. Must be called with lock held.
@@ -1100,14 +1150,20 @@ def clear_request_compression_store() -> None:
 
 
 def _create_default_ccr_backend() -> CompressionStoreBackend | None:
-    """Create a CCR backend from env (e.g. HEADROOM_CCR_BACKEND=redis).
+    """Create a CCR backend from env.
 
-    Loads adapters via setuptools entry point 'headroom.ccr_backend'.
-    Returns None to use default InMemoryBackend.
+    ``HEADROOM_CCR_BACKEND=sqlite`` uses Headroom's first-party local
+    SQLite backend. Other names load adapters via setuptools entry point
+    ``headroom.ccr_backend``. Returns None to use default InMemoryBackend.
     """
     backend_type = (os.environ.get("HEADROOM_CCR_BACKEND") or "").strip().lower()
     if not backend_type or backend_type == "memory":
         return None
+    if backend_type == "sqlite":
+        from ..paths import ccr_sqlite_path
+        from .backends import SQLiteBackend
+
+        return SQLiteBackend(ccr_sqlite_path())
     try:
         from importlib.metadata import entry_points
 
@@ -1130,6 +1186,16 @@ def _create_default_ccr_backend() -> CompressionStoreBackend | None:
     except Exception as e:
         logger.warning("Failed to load CCR backend %s: %s", backend_type, e)
         return None
+
+
+def _resolve_default_ttl(default_ttl: int) -> int:
+    env_ttl = _env_int("HEADROOM_CCR_TTL_SECONDS")
+    if env_ttl is not None and default_ttl == 300:
+        if env_ttl < 0:
+            logger.warning("Ignoring invalid HEADROOM_CCR_TTL_SECONDS=%s; expected >= 0", env_ttl)
+            return default_ttl
+        return env_ttl
+    return default_ttl
 
 
 def get_compression_store(
@@ -1164,7 +1230,7 @@ def get_compression_store(
                     backend = _create_default_ccr_backend()
                 _compression_store = CompressionStore(
                     max_entries=max_entries,
-                    default_ttl=default_ttl,
+                    default_ttl=_resolve_default_ttl(default_ttl),
                     backend=backend,
                 )
     return _compression_store
@@ -1177,4 +1243,5 @@ def reset_compression_store() -> None:
     with _store_lock:
         if _compression_store is not None:
             _compression_store.clear()
+            _compression_store.close()
         _compression_store = None
