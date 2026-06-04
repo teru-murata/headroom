@@ -67,7 +67,7 @@ class TestDigestBuilder:
         sessions = [SessionData(session_id="s1", tool_calls=[_tc()])]
         digest = _build_digest(project, sessions)
         assert "test-project" in digest
-        assert "/tmp/test-project" in digest
+        assert "/tmp/test-project" in digest.replace("\\", "/")
 
     def test_includes_session_stats(self):
         sessions = [

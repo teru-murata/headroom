@@ -42,9 +42,10 @@ def test_get_dashboard_html_reads_as_utf8(monkeypatch) -> None:
 
     assert captured["encoding"] == "utf-8"
     assert html  # non-empty
-    # Content must equal an explicit UTF-8 decode of the raw template.
+    # Content must equal an explicit UTF-8 decode of the raw template,
+    # independent of platform newline translation performed by read_text().
     expected = (TEMPLATES_DIR / "dashboard.html").read_bytes().decode("utf-8")
-    assert html == expected
+    assert html.splitlines() == expected.splitlines()
 
 
 def test_sync_state_round_trips_non_ascii(tmp_path) -> None:
