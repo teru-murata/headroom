@@ -2,13 +2,119 @@
 
 import json
 
+import pytest
+
+from headroom.cache.compression_store import get_compression_store, reset_compression_store
 from headroom.ccr import (
     CCR_TOOL_NAME,
     CCRToolInjector,
     create_ccr_tool_definition,
     create_system_instructions,
+    is_supported_ccr_hash,
+    normalize_ccr_hash,
+    parse_ccr_markers,
+    parse_first_ccr_marker,
     parse_tool_call,
 )
+
+
+class TestCCRMarkerParsing:
+    """Test central CCR marker parsing."""
+
+    def test_existing_bracket_marker_parses(self):
+        """Existing bracket retrieve marker parses through the shared parser."""
+        text = "[100 items compressed to 10. Retrieve more: hash=abc123def456abc123def456]"
+
+        markers = parse_ccr_markers(text)
+
+        assert len(markers) == 1
+        marker = markers[0]
+        assert marker.raw == text
+        assert marker.family == "bracket_retrieve"
+        assert marker.hash == "abc123def456abc123def456"
+        assert marker.start == 0
+        assert marker.end == len(text)
+
+    def test_smartcrusher_angle_marker_parses(self):
+        """SmartCrusher row-drop angle marker parses and captures metadata."""
+        text = 'sentinel {"_ccr_dropped":"<<ccr:89f81e97033e 15_rows_offloaded>>"}'
+
+        marker = parse_first_ccr_marker(text)
+
+        assert marker is not None
+        assert marker.family == "angle_ccr"
+        assert marker.hash == "89f81e97033e"
+        assert marker.metadata == "15_rows_offloaded"
+
+    def test_smartcrusher_opaque_blob_marker_parses(self):
+        """SmartCrusher opaque-blob angle marker parses comma metadata."""
+        marker = parse_first_ccr_marker('{"blob":"<<ccr:abc123def456,base64,4.5KB>>"}')
+
+        assert marker is not None
+        assert marker.family == "angle_ccr"
+        assert marker.hash == "abc123def456"
+        assert marker.metadata == ",base64,4.5KB"
+
+    def test_supported_hash_validation_matches_local_emitters(self):
+        """Local CCR supports SmartCrusher 12-hex and store/live-zone 24-hex keys."""
+        assert is_supported_ccr_hash("abc123def456")
+        assert is_supported_ccr_hash("abc123def456abc123def456")
+        assert normalize_ccr_hash("ABC123DEF456") == "abc123def456"
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "abc123",
+            "abc123def456abc123def456abc123",
+            "abc123xyz456",
+            "abc123def456\n",
+            "../abc123def456",
+            "abc123def456/secret",
+            "",
+        ],
+    )
+    def test_rejects_unsupported_hash_values(self, value):
+        """Malformed hash values are not accepted as local CCR hashes."""
+        assert not is_supported_ccr_hash(value)
+        with pytest.raises(ValueError):
+            normalize_ccr_hash(value)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "<<ccr:abc123def456 ../secret>>",
+            "<<ccr:abc123def456,path\\secret>>",
+            "<<ccr:abc123def456..secret>>",
+            "[10 items compressed to 1. Retrieve more: hash=abc123def456 ../secret]",
+            "[10 items compressed to 1. Retrieve more: hash=abc123def456x]",
+        ],
+    )
+    def test_rejects_malformed_marker_text(self, text):
+        """Markers with unsafe suffixes or malformed hash boundaries are rejected."""
+        assert parse_ccr_markers(text) == []
+        with pytest.raises(ValueError):
+            normalize_ccr_hash(text)
+
+    def test_multiple_markers_are_returned_in_text_order(self):
+        """Multiple marker families in one text are deterministic."""
+        text = (
+            "<<ccr:111111111111 3_rows_offloaded>> "
+            "[20 lines compressed to 2. Retrieve more: hash=222222222222222222222222] "
+            "<<ccr:333333333333,base64,1.0KB>>"
+        )
+
+        markers = parse_ccr_markers(text)
+
+        assert [m.hash for m in markers] == [
+            "111111111111",
+            "222222222222222222222222",
+            "333333333333",
+        ]
+        assert [m.family for m in markers] == [
+            "angle_ccr",
+            "bracket_retrieve",
+            "angle_ccr",
+        ]
 
 
 class TestCCRToolDefinition:
@@ -63,6 +169,21 @@ class TestCCRToolInjector:
 
         assert len(hashes) == 1
         assert "abc123def456abc123def456" in hashes
+        assert injector.has_compressed_content
+
+    def test_scan_for_smartcrusher_angle_marker_finds_hash(self):
+        """Scanner detects SmartCrusher angle markers in messages."""
+        messages = [
+            {
+                "role": "tool",
+                "content": '[{"id":1},{"_ccr_dropped":"<<ccr:89f81e97033e 15_rows_offloaded>>"}]',
+            },
+        ]
+
+        injector = CCRToolInjector()
+        hashes = injector.scan_for_markers(messages)
+
+        assert hashes == ["89f81e97033e"]
         assert injector.has_compressed_content
 
     def test_scan_for_markers_multiple_hashes(self):
@@ -134,6 +255,23 @@ class TestCCRToolInjector:
             {
                 "role": "tool",
                 "content": "[100 items compressed to 10. Retrieve more: hash=abc123def456abc123def456]",
+            },
+        ]
+
+        injector = CCRToolInjector(provider="anthropic")
+        injector.scan_for_markers(messages)
+        tools, was_injected = injector.inject_tool_definition(None)
+
+        assert was_injected
+        assert len(tools) == 1
+        assert tools[0]["name"] == CCR_TOOL_NAME
+
+    def test_inject_tool_when_smartcrusher_marker_detected(self):
+        """Tool is injected when SmartCrusher angle markers are found."""
+        messages = [
+            {
+                "role": "tool",
+                "content": '[{"_ccr_dropped":"<<ccr:89f81e97033e 15_rows_offloaded>>"}]',
             },
         ]
 
@@ -315,12 +453,53 @@ class TestParseToolCall:
 
         assert hash_key is None
 
+    def test_parse_accepts_smartcrusher_hash(self):
+        """Parse accepts SmartCrusher's 12-hex local CCR hash."""
+        tool_call = {
+            "id": "toolu_123",
+            "name": CCR_TOOL_NAME,
+            "input": {"hash": "89f81e97033e", "query": "errors"},
+        }
+
+        hash_key, query = parse_tool_call(tool_call, "anthropic")
+
+        assert hash_key == "89f81e97033e"
+        assert query == "errors"
+
+    def test_parse_accepts_smartcrusher_marker_text(self):
+        """Parse accepts full SmartCrusher marker text and normalizes to hash."""
+        tool_call = {
+            "id": "toolu_123",
+            "name": CCR_TOOL_NAME,
+            "input": {"hash": "<<ccr:89f81e97033e 15_rows_offloaded>>"},
+        }
+
+        hash_key, query = parse_tool_call(tool_call, "anthropic")
+
+        assert hash_key == "89f81e97033e"
+        assert query is None
+
+    def test_parse_accepts_bracket_marker_text(self):
+        """Parse accepts full bracket marker text and normalizes to hash."""
+        marker = "[100 items compressed to 10. Retrieve more: hash=abc123def456abc123def456]"
+        tool_call = {
+            "id": "toolu_123",
+            "name": CCR_TOOL_NAME,
+            "input": {"hash": marker},
+        }
+
+        hash_key, query = parse_tool_call(tool_call, "anthropic")
+
+        assert hash_key == "abc123def456abc123def456"
+        assert query is None
+
 
 class TestHashSecurityValidation:
     """Test hash validation security measures.
 
-    CCR hashes must be exactly 24 hex characters (96 bits of SHA256).
-    This prevents hash spoofing attacks with shorter or malformed hashes.
+    Local CCR hashes must match one of the explicit supported emitter
+    forms: 12 hex chars for SmartCrusher markers or 24 hex chars for
+    compression_store/live-zone keys.
     """
 
     def test_rejects_short_hash(self):
@@ -353,6 +532,28 @@ class TestHashSecurityValidation:
         hash_key, query = parse_tool_call(tool_call, "anthropic")
         assert hash_key is None  # Rejected
 
+    def test_rejects_path_traversal_marker(self):
+        """Rejects marker text with unsafe path traversal metadata."""
+        tool_call = {
+            "name": CCR_TOOL_NAME,
+            "input": {"hash": "<<ccr:abc123def456 ../secret>>"},
+        }
+
+        hash_key, query = parse_tool_call(tool_call, "anthropic")
+        assert hash_key is None
+        assert query is None
+
+    def test_rejects_hash_with_whitespace(self):
+        """Rejects raw hash strings with whitespace."""
+        tool_call = {
+            "name": CCR_TOOL_NAME,
+            "input": {"hash": "abc123def456 "},
+        }
+
+        hash_key, query = parse_tool_call(tool_call, "anthropic")
+        assert hash_key is None
+        assert query is None
+
     def test_accepts_valid_24_char_hash(self):
         """Accepts properly formatted 24-char hex hash."""
         tool_call = {
@@ -363,16 +564,25 @@ class TestHashSecurityValidation:
         hash_key, query = parse_tool_call(tool_call, "anthropic")
         assert hash_key == "abc123def456abc123def456"
 
+    def test_accepts_valid_12_char_hash(self):
+        """Accepts properly formatted 12-char SmartCrusher hash."""
+        tool_call = {
+            "name": CCR_TOOL_NAME,
+            "input": {"hash": "89f81e97033e"},
+        }
+
+        hash_key, query = parse_tool_call(tool_call, "anthropic")
+        assert hash_key == "89f81e97033e"
+
     def test_accepts_uppercase_hex(self):
-        """Accepts uppercase hex characters (normalized to lowercase internally)."""
+        """Accepts uppercase hex characters and normalizes to lowercase."""
         tool_call = {
             "name": CCR_TOOL_NAME,
             "input": {"hash": "ABC123DEF456ABC123DEF456"},
         }
 
         hash_key, query = parse_tool_call(tool_call, "anthropic")
-        # Note: validation accepts uppercase since we use .lower() for hex check
-        assert hash_key == "ABC123DEF456ABC123DEF456"
+        assert hash_key == "abc123def456abc123def456"
 
 
 class TestSystemInstructions:
@@ -487,3 +697,84 @@ class TestAlternativeMarkerFormats:
 
         assert len(hashes) == 1
         assert "fedcba9876543210fedcba98" in hashes
+
+
+class TestCCRMarkerRetrieveIntegration:
+    """Integration tests for marker text through local retrieve flow."""
+
+    def test_existing_bracket_marker_tool_call_resolves_store_entry(self):
+        """Bracket marker text can parse, inject, and retrieve from compression_store."""
+        reset_compression_store()
+        try:
+            store = get_compression_store()
+            original = json.dumps([{"id": 1, "message": "full original"}])
+            hash_key = store.store(original=original, compressed="[]")
+            marker = f"[10 items compressed to 1. Retrieve more: hash={hash_key}]"
+
+            parsed_marker = parse_first_ccr_marker(marker)
+            assert parsed_marker is not None
+            assert parsed_marker.hash == hash_key
+
+            injector = CCRToolInjector()
+            hashes = injector.scan_for_markers([{"role": "tool", "content": marker}])
+            assert hashes == [hash_key]
+
+            parsed_hash, query = parse_tool_call(
+                {"name": CCR_TOOL_NAME, "input": {"hash": marker}},
+                "anthropic",
+            )
+            assert parsed_hash == hash_key
+            assert query is None
+
+            entry = store.retrieve(parsed_hash)
+            assert entry is not None
+            assert entry.original_content == original
+        finally:
+            reset_compression_store()
+
+    def test_smartcrusher_marker_end_to_end_resolves_store_entry(self):
+        """SmartCrusher-emitted marker flows through parser, injection, tool call, and store."""
+        pytest.importorskip("headroom._core")
+
+        from headroom.config import CCRConfig
+        from headroom.config import SmartCrusherConfig as PyConfig
+        from headroom.transforms.smart_crusher import SmartCrusher
+
+        reset_compression_store()
+        try:
+            crusher = SmartCrusher(PyConfig(), ccr_config=CCRConfig(), with_compaction=False)
+            original = [
+                {
+                    "id": i,
+                    "level": "error" if i % 30 == 0 else "info",
+                    "message": f"line {i}",
+                }
+                for i in range(80)
+            ]
+            content = json.dumps(original)
+
+            crushed, was_modified, info = crusher._smart_crush_content(content)
+
+            assert was_modified, f"expected SmartCrusher modification, got info={info!r}"
+            assert "<<ccr:" in crushed
+
+            markers = [m for m in parse_ccr_markers(crushed) if m.family == "angle_ccr"]
+            assert markers, f"expected angle CCR marker in {crushed[:200]!r}"
+            marker = markers[0]
+
+            injector = CCRToolInjector()
+            hashes = injector.scan_for_markers([{"role": "tool", "content": crushed}])
+            assert marker.hash in hashes
+
+            parsed_hash, query = parse_tool_call(
+                {"name": CCR_TOOL_NAME, "input": {"hash": marker.raw}},
+                "anthropic",
+            )
+            assert parsed_hash == marker.hash
+            assert query is None
+
+            entry = get_compression_store().retrieve(parsed_hash)
+            assert entry is not None
+            assert json.loads(entry.original_content) == original
+        finally:
+            reset_compression_store()

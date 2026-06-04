@@ -42,6 +42,13 @@ from .context_tracker import (
     get_context_tracker,
     reset_context_tracker,
 )
+from .markers import (
+    CCRMarker,
+    is_supported_ccr_hash,
+    normalize_ccr_hash,
+    parse_ccr_markers,
+    parse_first_ccr_marker,
+)
 from .response_handler import (
     CCRResponseHandler,
     CCRToolCall,
@@ -75,6 +82,11 @@ __all__ = [
     "create_ccr_tool_definition",
     "create_system_instructions",
     "parse_tool_call",
+    "CCRMarker",
+    "is_supported_ccr_hash",
+    "normalize_ccr_hash",
+    "parse_ccr_markers",
+    "parse_first_ccr_marker",
     # Response handling
     "CCRResponseHandler",
     "CCRToolCall",

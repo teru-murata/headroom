@@ -48,6 +48,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from ..ccr.markers import normalize_ccr_hash, parse_ccr_markers
 from ..config import CCRConfig, TransformResult
 from ..tokenizer import Tokenizer
 from ..utils import compute_short_hash, create_tool_digest_marker, deep_copy_messages
@@ -647,37 +648,10 @@ class SmartCrusher(Transform):
 
     @staticmethod
     def _collect_ccr_hashes_from_string(s: str, sink: set[str]) -> None:
-        """Extract every `<<ccr:HASH...>>` hash from a string by
-        substring scan (no regex). The marker grammar is fixed:
-
-            <<ccr:HASH<sep>...>>
-
-        where ``HASH`` is `[0-9a-f]+` and ``<sep>`` is one of the
-        delimiters the Rust emitters use today: a single space (the
-        row-drop summary, ``<<ccr:abc 100_rows_offloaded>>``) or a
-        comma (the opaque-blob marker, ``<<ccr:abc,base64,4.5KB>>``).
-        We accept either delimiter and tolerate `>>` as the terminator
-        (the case where the marker is just `<<ccr:abc>>` with no
-        suffix, used by the bare CCR helpers).
-        """
-        idx = 0
-        prefix = "<<ccr:"
-        n = len(s)
-        while True:
-            start = s.find(prefix, idx)
-            if start == -1:
-                return
-            cursor = start + len(prefix)
-            end = cursor
-            while end < n and s[end] in "0123456789abcdefABCDEF":
-                end += 1
-            if end == cursor:
-                # No hex chars after `<<ccr:` — not a real marker.
-                idx = cursor
-                continue
-            hash_str = s[cursor:end].lower()
-            sink.add(hash_str)
-            idx = end
+        """Extract supported SmartCrusher angle-marker hashes."""
+        for marker in parse_ccr_markers(s):
+            if marker.family == "angle_ccr":
+                sink.add(marker.hash)
 
     def _mirror_single_hash_to_python_store(
         self,
@@ -689,6 +663,12 @@ class SmartCrusher(Transform):
         """Mirror a single Rust-stored CCR entry into the Python
         compression_store, keyed by `ccr_hash`. Best-effort.
         """
+        try:
+            ccr_hash = normalize_ccr_hash(ccr_hash)
+        except ValueError:
+            logger.warning("CCR mirror: invalid hash %r from rendered marker", ccr_hash)
+            return
+
         canonical = self._rust.ccr_get(ccr_hash)
         if canonical is None:
             # Rust store doesn't have it — either the marker came from

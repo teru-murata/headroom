@@ -14,9 +14,10 @@ The LLM can then call the tool or follow instructions to retrieve more data.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from typing import Any
+
+from .markers import normalize_ccr_hash, parse_ccr_markers
 
 # Tool name constant - used for matching tool calls
 CCR_TOOL_NAME = "headroom_retrieve"
@@ -46,14 +47,18 @@ def create_ccr_tool_definition(
             "description": (
                 "Retrieve original uncompressed content that was compressed to save tokens. "
                 "Use this when you need more data than what's shown in compressed tool results. "
-                "The hash is provided in compression markers like [N items compressed... hash=abc123]."
+                "The hash is provided in compression markers like "
+                "[N items compressed... hash=abc123def456abc123def456] or "
+                "<<ccr:abc123def456 ...>>."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "hash": {
                         "type": "string",
-                        "description": "Hash key from the compression marker (e.g., 'abc123' from hash=abc123)",
+                        "description": (
+                            "Hash key from a local CCR marker, or the marker text itself."
+                        ),
                     },
                     "query": {
                         "type": "string",
@@ -79,14 +84,18 @@ def create_ccr_tool_definition(
             "description": (
                 "Retrieve original uncompressed content that was compressed to save tokens. "
                 "Use this when you need more data than what's shown in compressed tool results. "
-                "The hash is provided in compression markers like [N items compressed... hash=abc123]."
+                "The hash is provided in compression markers like "
+                "[N items compressed... hash=abc123def456abc123def456] or "
+                "<<ccr:abc123def456 ...>>."
             ),
             "input_schema": {
                 "type": "object",
                 "properties": {
                     "hash": {
                         "type": "string",
-                        "description": "Hash key from the compression marker (e.g., 'abc123' from hash=abc123)",
+                        "description": (
+                            "Hash key from a local CCR marker, or the marker text itself."
+                        ),
                     },
                     "query": {
                         "type": "string",
@@ -160,8 +169,9 @@ the full uncompressed data, you can retrieve it using the `{CCR_TOOL_NAME}` tool
 
 **Available hashes:** {hash_list}
 
-Look for markers like `[N items compressed to M. Retrieve more: hash=abc123]`
-in tool results to find the hash for each compressed output.
+Look for markers like `[N items compressed to M. Retrieve more: hash=abc123def456abc123def456]`
+or `<<ccr:abc123def456 ...>>` in tool results to find the hash for each
+compressed output.
 """
 
 
@@ -194,27 +204,6 @@ class CCRToolInjector:
 
     # Detected compression markers
     _detected_hashes: list[str] = field(default_factory=list)
-    # Multiple marker patterns to match different compressors:
-    # - SmartCrusher: [100 items compressed to 10. Retrieve more: hash=abc123]
-    # - Kompress: [100 lines compressed to 10. Retrieve more: hash=abc123]
-    # - LogCompressor: [200 lines compressed to 20. Retrieve more: hash=abc123]
-    # - SearchCompressor: [50 matches compressed to 5. Retrieve more: hash=abc123]
-    # - Generic: any [... compressed ... hash=xxx] pattern
-    _marker_patterns: list[re.Pattern] = field(
-        default_factory=lambda: [
-            # All patterns require exactly 24 hex characters for hash validation
-            # CCR uses SHA256 truncated to 24 hex chars (96 bits) for collision resistance
-            # Requiring exact length prevents hash spoofing attacks with shorter hashes
-            #
-            # Standard format: [N <type> compressed to M. Retrieve more: hash=xxx]
-            # Matches items, lines, matches, or any other type
-            re.compile(r"\[(\d+) \w+ compressed to (\d+)\. Retrieve more: hash=([a-f0-9]{24})\]"),
-            # Legacy format without "to M" or "Retrieve more:" (old TextCompressor)
-            re.compile(r"\[(\d+) \w+ compressed\. hash=([a-f0-9]{24})\]"),
-            # Generic fallback: any compression marker with hash (exactly 24 chars)
-            re.compile(r"\[.*?compressed.*?hash=([a-f0-9]{24})\]", re.IGNORECASE),
-        ]
-    )
 
     def __post_init__(self) -> None:
         # Reset detected hashes
@@ -288,16 +277,9 @@ class CCRToolInjector:
 
     def _scan_text(self, text: str) -> None:
         """Scan text for compression markers from any compressor."""
-        for pattern in self._marker_patterns:
-            matches = pattern.findall(text)
-            for match in matches:
-                # Extract hash_key from match (last group is always the hash)
-                if isinstance(match, tuple):
-                    hash_key = match[-1]  # Last capture group is the hash
-                else:
-                    hash_key = match  # Single capture group (generic pattern)
-                if hash_key and hash_key not in self._detected_hashes:
-                    self._detected_hashes.append(hash_key)
+        for marker in parse_ccr_markers(text):
+            if marker.hash not in self._detected_hashes:
+                self._detected_hashes.append(marker.hash)
 
     def inject_tool_definition(
         self,
@@ -494,16 +476,18 @@ def parse_tool_call(
     if name != CCR_TOOL_NAME:
         return None, None
 
-    hash_key = input_data.get("hash")
+    if not isinstance(input_data, dict):
+        return None, None
+
+    hash_value = input_data.get("hash")
     query = input_data.get("query")
 
-    # Validate hash format: must be exactly 24 hex characters
-    # This prevents hash spoofing attacks with malformed hashes
-    if hash_key is not None:
-        if not isinstance(hash_key, str) or len(hash_key) != 24:
-            return None, None
-        # Validate hex characters only
-        if not all(c in "0123456789abcdef" for c in hash_key.lower()):
-            return None, None
+    if hash_value is None:
+        return None, None
+
+    try:
+        hash_key = normalize_ccr_hash(hash_value)
+    except ValueError:
+        return None, None
 
     return hash_key, query

@@ -34,6 +34,8 @@ from typing import Any
 
 from headroom import paths as _paths
 
+from .markers import normalize_ccr_hash
+
 # fcntl is Unix-only; on Windows we skip file locking (stats are best-effort).
 # Keep the module typed as Any so Windows mypy runs don't try to resolve Unix-only attrs.
 fcntl: Any = None
@@ -648,6 +650,15 @@ class HeadroomMCPServer:
                 TextContent(
                     type="text",
                     text=json.dumps({"error": "hash parameter is required"}),
+                )
+            ]
+        try:
+            hash_key = normalize_ccr_hash(hash_key)
+        except ValueError:
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps({"error": "unsupported CCR hash or marker"}),
                 )
             ]
 
