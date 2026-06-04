@@ -1,0 +1,28 @@
+$ rg "requireUser|CheckoutSummary" -n src tests packages
+src/server/auth.ts:12:export async function requireUser(session: Session | null) {
+src/server/auth.ts:18:  if (!session?.user?.id) throw new AuthError("missing user");
+src/server/auth.ts:24:  return requireUser(await getServerSession());
+src/server/auth.ts:31:  auditAuthFailure("requireUser", session?.user?.id);
+src/server/routes/checkout.ts:8:import { requireUser } from "../auth";
+src/server/routes/checkout.ts:44:  const user = await requireUser(session);
+src/server/routes/checkout.ts:49:  return createCheckoutSession(user.id, body.cartId);
+src/components/CheckoutSummary.tsx:4:export function CheckoutSummary(props: CheckoutSummaryProps) {
+src/components/CheckoutSummary.tsx:18:  return <section aria-label="CheckoutSummary">{props.total}</section>;
+src/components/CheckoutSummary.tsx:27:  <CheckoutSummary total={formatMoney(total)} />
+tests/server/auth.test.ts:7:import { requireUser } from "../../src/server/auth";
+tests/server/auth.test.ts:19:it("requireUser rejects anonymous sessions", async () => {
+tests/server/auth.test.ts:20:  await expect(requireUser(null)).rejects.toThrow("missing user");
+tests/server/auth.test.ts:35:it("requireUser returns user id for active sessions", async () => {
+tests/server/routes/checkout.test.ts:12:vi.mock("../../src/server/auth", () => ({ requireUser: vi.fn() }));
+tests/server/routes/checkout.test.ts:39:expect(requireUser).toHaveBeenCalledOnce();
+tests/components/CheckoutSummary.test.tsx:5:import { CheckoutSummary } from "../../src/components/CheckoutSummary";
+tests/components/CheckoutSummary.test.tsx:14:render(<CheckoutSummary total="$10.00" />);
+tests/components/CheckoutSummary.test.tsx:17:expect(screen.getByLabelText("CheckoutSummary")).toBeVisible();
+packages/billing/src/authz.ts:72:export const requireUserForBilling = requireUser;
+packages/billing/tests/authz.test.ts:22:expect(requireUserForBilling).toBeDefined();
+vendor/generated/auth_fixture.ts:1:requireUser requireUser requireUser requireUser
+vendor/generated/auth_fixture.ts:2:requireUser requireUser requireUser requireUser
+vendor/generated/auth_fixture.ts:3:requireUser requireUser requireUser requireUser
+vendor/generated/auth_fixture.ts:4:requireUser requireUser requireUser requireUser
+vendor/generated/auth_fixture.ts:5:requireUser requireUser requireUser requireUser
+vendor/generated/auth_fixture.ts:6:requireUser requireUser requireUser requireUser

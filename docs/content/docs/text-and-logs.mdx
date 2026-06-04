@@ -188,6 +188,30 @@ result = compressor.compress(tree_output, context="src/server/auth.ts")
 - `node_modules`, `vendor`, `dist`, `build`, `coverage`, `.cache`, and similar generated/cache directories
 - Long repeated generated path lists
 
+## Coding-Agent Preset
+
+`CodingAgentPreset` routes noisy coding-agent context by source type instead of
+blindly compressing source code.
+
+```python
+from headroom.presets import CodingAgentPreset
+
+preset = CodingAgentPreset()
+result = preset.route_and_compress(
+    "test_log",
+    pytest_output,
+    {"command": "python -m pytest tests/test_checkout.py -q"},
+)
+```
+
+Supported local routes include test logs, build logs, search results, file
+trees, git diffs, package metadata, MCP/tool responses, and generic noisy tool
+output. Source code is preserved verbatim by default. When a preset omits
+substantial output, it uses the existing local CCR marker/store flow so the
+full original can be retrieved locally. Hosted/team marker policy, Redis/Valkey
+profiles, and SaaS retrieve authorization remain outside Headroom's local
+preset layer.
+
 ## TextCompressor
 
 General-purpose text compression with anchor preservation. Best for documentation, README files, and prose content.

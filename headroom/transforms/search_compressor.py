@@ -353,11 +353,10 @@ class SearchCompressor:
 
         try:
             store: Any = get_compression_store()
-            # The Python `CompressionStore.store` API takes original,
-            # compressed, and an optional original_item_count. The
-            # cache_key it returns will be the same as Rust's because
-            # both use MD5(original)[:24].
-            store.store(original, compressed)
+            # The Rust path owns the prompt-visible cache key. Mirror it
+            # explicitly so marker text and the Python CompressionStore key
+            # stay aligned even if the store's default hash changes.
+            store.store(original, compressed, explicit_hash=cache_key)
         except Exception as e:
             logger.warning(
                 "CCR store write failed; cache_key %s remains in-marker only: %s", cache_key, e

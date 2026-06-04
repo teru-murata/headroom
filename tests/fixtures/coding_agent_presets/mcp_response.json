@@ -1,0 +1,71 @@
+{
+  "tool": "repo.search",
+  "arguments": {
+    "query": "requireUser",
+    "path": "src",
+    "limit": 20
+  },
+  "status": "error",
+  "error": "Permission denied reading src/server/secret.ts while expanding search results",
+  "count": 9,
+  "results": [
+    {
+      "path": "src/server/auth.ts",
+      "line": 12,
+      "text": "export async function requireUser(session: Session | null) {",
+      "resource_id": "file:src/server/auth.ts"
+    },
+    {
+      "path": "src/server/auth.ts",
+      "line": 18,
+      "text": "if (!session?.user?.id) throw new AuthError(\"missing user\");",
+      "resource_id": "file:src/server/auth.ts"
+    },
+    {
+      "path": "src/server/routes/checkout.ts",
+      "line": 44,
+      "text": "const user = await requireUser(session);",
+      "resource_id": "file:src/server/routes/checkout.ts"
+    },
+    {
+      "path": "tests/server/auth.test.ts",
+      "line": 19,
+      "text": "it(\"requireUser rejects anonymous sessions\", async () => {",
+      "resource_id": "file:tests/server/auth.test.ts"
+    },
+    {
+      "path": "tests/server/auth.test.ts",
+      "line": 20,
+      "text": "await expect(requireUser(null)).rejects.toThrow(\"missing user\");",
+      "resource_id": "file:tests/server/auth.test.ts"
+    },
+    {
+      "path": "vendor/generated/auth_fixture.ts",
+      "line": 1,
+      "text": "requireUser requireUser requireUser requireUser",
+      "resource_id": "file:vendor/generated/auth_fixture.ts"
+    },
+    {
+      "path": "vendor/generated/auth_fixture.ts",
+      "line": 2,
+      "text": "requireUser requireUser requireUser requireUser",
+      "resource_id": "file:vendor/generated/auth_fixture.ts"
+    },
+    {
+      "path": "vendor/generated/auth_fixture.ts",
+      "line": 3,
+      "text": "requireUser requireUser requireUser requireUser",
+      "resource_id": "file:vendor/generated/auth_fixture.ts"
+    },
+    {
+      "path": "vendor/generated/auth_fixture.ts",
+      "line": 4,
+      "text": "requireUser requireUser requireUser requireUser",
+      "resource_id": "file:vendor/generated/auth_fixture.ts"
+    }
+  ],
+  "pagination": {
+    "next_cursor": "cursor-002",
+    "has_more": true
+  }
+}

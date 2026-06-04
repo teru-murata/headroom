@@ -1,0 +1,50 @@
+$ npm run generate && npm run check
+starting workspace task runner
+loading cache manifest
+checking 48 packages
+download package 1/48
+download package 2/48
+download package 3/48
+download package 4/48
+download package 5/48
+download package 6/48
+download package 7/48
+download package 8/48
+download package 9/48
+download package 10/48
+download package 11/48
+download package 12/48
+download package 13/48
+download package 14/48
+download package 15/48
+download package 16/48
+download package 17/48
+download package 18/48
+download package 19/48
+download package 20/48
+download package 21/48
+download package 22/48
+download package 23/48
+download package 24/48
+download package 25/48
+download package 26/48
+download package 27/48
+download package 28/48
+download package 29/48
+download package 30/48
+WARN workspace package apps/web has deprecated peer dependency
+WARN workspace package packages/billing has duplicate generated file
+generating artifact chunk 1/20
+generating artifact chunk 2/20
+generating artifact chunk 3/20
+generating artifact chunk 4/20
+generating artifact chunk 5/20
+generating artifact chunk 6/20
+generating artifact chunk 7/20
+generating artifact chunk 8/20
+generating artifact chunk 9/20
+generating artifact chunk 10/20
+src/server/auth.ts:214:19 ERROR expected SessionUser but got null
+tests/server/auth.test.ts:20:11 AssertionError: expected missing user error
+ERROR task failed while validating src/server/auth.ts
+exit code: 2
