@@ -1,0 +1,137 @@
+H008 validation log
+title: coding-agent context waste taxonomy benchmark suite
+commit: uncommitted H008 working tree
+captured_at: 2026-06-04T22:34:56+09:00
+full_pytest: not run
+sanitized_paths: true
+
+Scope:
+- issue #14 local/offline benchmark suite for coding-agent context waste
+- synthetic fixtures only
+- no LLM calls and no remote provider calls
+- no SaaS/control-plane/billing/dashboard/deployment/Redis/coding-agent-bridge changes
+- generated .headroom benchmark reports were not committed
+
+Primary command:
+python -m pytest tests/test_context_waste_benchmark.py
+
+Primary result:
+Exit code: 0
+14 passed, 1 warning in 0.78s
+
+Representative accepted test evidence:
+tests/test_context_waste_benchmark.py::test_manifest_loads_and_validates_all_fixture_paths PASSED
+tests/test_context_waste_benchmark.py::test_every_required_source_type_has_a_fixture PASSED
+tests/test_context_waste_benchmark.py::test_runner_produces_report_with_required_top_level_fields PASSED
+tests/test_context_waste_benchmark.py::test_every_row_has_source_type_and_token_estimates PASSED
+tests/test_context_waste_benchmark.py::test_totals_equal_sum_of_rows PASSED
+tests/test_context_waste_benchmark.py::test_log_fixtures_route_through_h004_log_behavior PASSED
+tests/test_context_waste_benchmark.py::test_git_diff_and_file_tree_route_through_h005_behavior PASSED
+tests/test_context_waste_benchmark.py::test_h006_preset_routes_search_package_mcp_and_tool_outputs PASSED
+tests/test_context_waste_benchmark.py::test_source_code_file_read_is_not_blindly_compressed PASSED
+tests/test_context_waste_benchmark.py::test_ccr_marker_retrievability_is_checked_for_rows_with_markers PASSED
+tests/test_context_waste_benchmark.py::test_ledger_event_source_type_matches_benchmark_source_type PASSED
+tests/test_context_waste_benchmark.py::test_report_serialization_to_json_and_jsonl_works PASSED
+tests/test_context_waste_benchmark.py::test_token_estimates_are_deterministic PASSED
+tests/test_context_waste_benchmark.py::test_runner_makes_no_remote_network_calls PASSED
+
+Compatibility commands:
+python -m pytest tests/test_coding_agent_presets.py
+result: 12 passed, 1 warning in 0.73s
+
+python -m pytest tests/test_provenance_ledger_emitter.py
+result: 12 passed, 1 warning in 0.74s
+
+python -m pytest tests/test_log_crusher_acceptance.py
+result: 8 passed, 1 warning in 0.67s
+
+python -m pytest tests/test_diff_file_tree_crusher_acceptance.py
+result: 14 passed, 1 warning in 0.72s
+
+python -m pytest tests/test_ccr_tool_injection.py
+result: 57 passed, 1 warning in 0.73s
+
+python -m pytest tests/test_proxy_ccr.py
+result: 30 passed, 4 warnings in 3.18s
+
+Benchmark runner command:
+python -m headroom.benchmarks.context_waste.runner --out .headroom\context-waste-report.json
+
+Benchmark runner result:
+Exit code: 0
+fixture_count: 18
+ledger_event_count: 29
+source_type_consistency:
+- checked_event_count: 18
+- matched_event_count: 18
+- mismatched_fixture_ids: []
+
+Report totals:
+- original_tokens_estimated: 3612
+- compressed_tokens_estimated: 2674
+- saved_tokens_estimated: 983
+- compression_ratio: 0.7403
+- ccr_marker_rows: 11
+- ccr_retrievable_rows: 11
+
+Required source taxonomy coverage:
+- tool_definitions
+- mcp_schemas
+- tool_outputs
+- build_logs
+- test_logs
+- search_results
+- file_reads
+- file_trees
+- git_diffs
+- rag_chunks
+- api_db_responses
+- conversation_history_residue
+- agent_memory_files
+- ccr_retrievals
+- sandbox_artifacts
+
+Compatibility fixture coverage:
+- package_metadata
+- mcp_tool_response
+
+Additional validation commands:
+ruff check headroom tests
+result: passed
+
+ruff format --check headroom tests
+result: passed
+
+git diff --check
+result: passed
+note: PowerShell/Git reported the existing CRLF warning for docs/content/docs/meta.json.
+
+cd docs; npm exec fumadocs-mdx
+result: passed
+output: [MDX] generated files in 8.63130000000001ms
+
+Known non-fatal warnings observed:
+- PytestUnhandledThreadExceptionWarning from subprocess reader cp1252 decode of byte 0x8f
+- StarletteDeprecationWarning in proxy tests
+- AnthropicProvider tiktoken approximation warning in proxy tests
+- TOIN get_recommendation() deprecation warning
+
+Not run:
+- full python -m pytest was not run
+
+Acceptance coverage retained:
+- benchmark fixture manifest exists and validates every path
+- all required taxonomy categories have fixtures
+- runner produces JSON report with totals, by_source_type, and rows
+- token counts are deterministic local estimates, not provider billing truth
+- totals equal the sum of rows
+- H004 log behavior is exercised for build_logs and test_logs
+- H005 diff/file-tree behavior is exercised for git_diffs and file_trees
+- H006 preset routing is exercised for search_results, package_metadata, mcp_tool_response, tool_outputs, and tool_definitions
+- source-code file read is not blindly compressed
+- CCR retrievability is checked for rows with markers
+- H007 ledger source_type compatibility is checked for compression/bypass events
+- no remote network calls are made by the runner test
+- no marketing savings claims were added
+
+Full pytest was not run for this validation log.

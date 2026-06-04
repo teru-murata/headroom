@@ -1,0 +1,15 @@
+﻿{
+  "tool": "db.query",
+  "status": "success",
+  "arguments": {"sql": "select * from orders where customer_id = ?"},
+  "count": 7,
+  "results": [
+    {"order_id": "ord_001", "customer_id": "cus_123", "status": "paid", "path": "db/orders/ord_001"},
+    {"order_id": "ord_002", "customer_id": "cus_123", "status": "failed", "error": "card declined"},
+    {"order_id": "ord_003", "customer_id": "cus_123", "status": "paid"},
+    {"order_id": "ord_004", "customer_id": "cus_123", "status": "paid"},
+    {"order_id": "ord_005", "customer_id": "cus_123", "status": "paid"},
+    {"order_id": "ord_006", "customer_id": "cus_123", "status": "paid"},
+    {"order_id": "ord_007", "customer_id": "cus_123", "status": "paid"}
+  ]
+}

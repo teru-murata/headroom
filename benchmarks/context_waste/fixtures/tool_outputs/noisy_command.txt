@@ -1,0 +1,14 @@
+﻿$ npm run generate && npm run check
+download package 001 ################################################
+download package 002 ################################################
+download package 003 ################################################
+download package 004 ################################################
+download package 005 ################################################
+WARN workspace package apps/web has deprecated peer dependency
+src/server/auth.ts:214:19 ERROR expected SessionUser but got null
+tests/server/auth.test.ts:20:11 AssertionError: expected missing user error
+download package 006 ################################################
+download package 007 ################################################
+download package 008 ################################################
+download package 009 ################################################
+exit code: 2

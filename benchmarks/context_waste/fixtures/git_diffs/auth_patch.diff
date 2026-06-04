@@ -1,0 +1,31 @@
+﻿diff --git a/src/server/auth.ts b/src/server/auth.ts
+index 1111111..2222222 100644
+--- a/src/server/auth.ts
++++ b/src/server/auth.ts
+@@ -1,8 +1,12 @@
++import { auditAuthFailure } from "./audit"
++
+ export type SessionUser = { id: string }
+
+-export function requireUser(userId?: string): SessionUser {
++export function requireUser(userId: string | undefined): SessionUser {
+   if (!userId) {
++    auditAuthFailure("missing-user")
+     throw new Error("missing user")
+   }
+   return { id: userId }
+ }
+diff --git a/tests/server/auth.test.ts b/tests/server/auth.test.ts
+index 3333333..4444444 100644
+--- a/tests/server/auth.test.ts
++++ b/tests/server/auth.test.ts
+@@ -1,5 +1,9 @@
+ import { requireUser } from "../../src/server/auth"
+
++test("requireUser records missing user", () => {
++  expect(() => requireUser(undefined)).toThrow("missing user")
++})
++
+ test("requireUser returns session user", () => {
+   expect(requireUser("u1").id).toBe("u1")
+ })

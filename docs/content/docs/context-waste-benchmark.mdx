@@ -1,0 +1,71 @@
+﻿---
+title: Context Waste Benchmark
+description: Measure where coding-agent context tokens are spent and how local compression handles each source type.
+---
+
+The context waste benchmark is a local, offline fixture suite for coding-agent
+context. It measures estimated input tokens, estimated compressed tokens, saved
+tokens, compression method, CCR marker presence, local CCR retrievability, and
+source-level ledger compatibility for each fixture.
+
+It is measurement tooling. It does not establish marketing savings claims and
+does not report provider billing truth.
+
+## Source Taxonomy
+
+The benchmark uses `source-taxonomy-v0` snake_case source types:
+
+- `tool_definitions`
+- `mcp_schemas`
+- `tool_outputs`
+- `build_logs`
+- `test_logs`
+- `search_results`
+- `file_reads`
+- `file_trees`
+- `git_diffs`
+- `rag_chunks`
+- `api_db_responses`
+- `conversation_history_residue`
+- `agent_memory_files`
+- `ccr_retrievals`
+- `sandbox_artifacts`
+
+Compatibility fixtures also cover existing local preset routes such as
+`package_metadata` and `mcp_tool_response`.
+
+## Run Locally
+
+```bash
+python -m headroom.benchmarks.context_waste.runner \
+  --fixtures benchmarks/context_waste/fixtures \
+  --out .headroom/context-waste-report.json
+```
+
+The JSON report includes:
+
+- `totals`
+- `by_source_type`
+- `rows`
+- `ledger_event_count`
+- `ledger_event_types`
+- `source_type_consistency`
+
+Each row includes estimated token counts, compression ratio, compression method,
+accuracy guard, CCR marker status, and warnings for missing fixture evidence.
+
+## Caveats
+
+Token counts are deterministic local estimates using `ceil(chars / 4)`. They
+are useful for comparing fixtures and detecting regressions, but they are not
+exact provider billing tokens.
+
+Results are workload-dependent. Provider billing impact also depends on cache
+behavior and retrieve cost, which should be evaluated separately from this
+taxonomy benchmark.
+
+## Boundary
+
+Headroom owns the local fixtures, source taxonomy, runner, and local JSON/JSONL
+reports. Hosted ingest, dashboards, long-term analytics, billing, customer ROI
+reporting, and remote retrieve authorization belong to `coding-agent-bridge`.

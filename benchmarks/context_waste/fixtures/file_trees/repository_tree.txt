@@ -1,0 +1,30 @@
+﻿.
+|-- package.json
+|-- pyproject.toml
+|-- Cargo.toml
+|-- src/
+|   |-- server/
+|   |   |-- auth.ts
+|   |   `-- session.ts
+|   |-- checkout/
+|   |   `-- summary.ts
+|-- tests/
+|   |-- server/
+|   |   `-- auth.test.ts
+|   |-- checkout/
+|   |   `-- session.test.ts
+|-- crates/
+|   `-- headroom-core/
+|       `-- src/
+|           `-- auth.rs
+|-- generated/
+|   |-- package_001/
+|   |-- package_002/
+|   |-- package_003/
+|   |-- package_004/
+|   |-- package_005/
+|   |-- package_006/
+|   |-- package_007/
+|   |-- package_008/
+|   |-- package_009/
+|   `-- package_010/

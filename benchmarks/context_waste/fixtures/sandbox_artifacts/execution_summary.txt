@@ -1,0 +1,10 @@
+﻿artifact_id=sandbox-run-17
+command: python /tmp/check.py
+exit code: 1
+kept_out_raw_artifact=.headroom/artifacts/sandbox-run-17/raw.log
+diagnostic: /tmp/check.py:18: AssertionError: expected 3 rows
+raw artifact preview line 001: binary payload omitted
+raw artifact preview line 002: binary payload omitted
+raw artifact preview line 003: binary payload omitted
+raw artifact preview line 004: binary payload omitted
+raw artifact preview line 005: binary payload omitted

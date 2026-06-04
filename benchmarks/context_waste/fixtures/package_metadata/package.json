@@ -1,0 +1,33 @@
+﻿{
+  "name": "@acme/checkout-web",
+  "version": "2.4.1",
+  "packageManager": "pnpm@9.4.0",
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "lint": "eslint src tests"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.0.0",
+    "axios": "1.7.0",
+    "decimal.js": "10.4.3",
+    "react": "18.3.0",
+    "react-dom": "18.3.0",
+    "zod": "3.23.0",
+    "zustand": "4.5.0",
+    "vite": "5.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.0",
+    "@vitejs/plugin-react": "4.3.0",
+    "eslint": "9.0.0",
+    "typescript": "5.5.0",
+    "vitest": "1.6.0"
+  },
+  "generatedMetadata": {
+    "line001": "generated dependency catalog entry",
+    "line002": "generated dependency catalog entry",
+    "line003": "generated dependency catalog entry",
+    "line004": "generated dependency catalog entry"
+  }
+}

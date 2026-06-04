@@ -1,0 +1,13 @@
+﻿$ rg "requireUser|CheckoutSummary" -n src tests packages
+src/server/auth.ts:12:export function requireUser(userId: string): SessionUser {
+src/server/auth.ts:13:  if (!userId) throw new Error("missing user")
+src/server/auth.ts:44:  return requireUser(session.user.id)
+src/checkout/summary.ts:8:export type CheckoutSummary = {
+src/checkout/summary.ts:29:  user: requireUser(session.user.id),
+tests/server/auth.test.ts:9:import { requireUser } from "../../src/server/auth"
+tests/server/auth.test.ts:20:  expect(() => requireUser("")).toThrow("missing user")
+tests/checkout/summary.test.ts:7:import type { CheckoutSummary } from "../../src/checkout/summary"
+packages/shared/auth.ts:5:export { requireUser } from "../../src/server/auth"
+packages/shared/generated/noise.ts:1:requireUser placeholder noise
+packages/shared/generated/noise.ts:2:requireUser placeholder noise
+packages/shared/generated/noise.ts:3:requireUser placeholder noise

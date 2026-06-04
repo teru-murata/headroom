@@ -16,11 +16,25 @@ from headroom.transforms.content_detector import ContentType, detect_content_typ
 logger = logging.getLogger(__name__)
 
 _SUPPORTED_SOURCE_TYPES = {
+    "tool_definitions",
+    "mcp_schemas",
+    "tool_outputs",
+    "build_logs",
+    "test_logs",
     "test_log",
     "build_log",
     "search_results",
+    "file_reads",
+    "file_trees",
     "file_tree",
+    "git_diffs",
     "git_diff",
+    "rag_chunks",
+    "api_db_responses",
+    "conversation_history_residue",
+    "agent_memory_files",
+    "ccr_retrievals",
+    "sandbox_artifacts",
     "package_metadata",
     "mcp_tool_response",
     "generic_tool_output",
@@ -132,6 +146,14 @@ _BUILD_LOG_RE = re.compile(
 )
 
 
+def _json_node_count(value: Any) -> int:
+    if isinstance(value, dict):
+        return 1 + sum(_json_node_count(child) for child in value.values())
+    if isinstance(value, list):
+        return 1 + sum(_json_node_count(child) for child in value)
+    return 1
+
+
 @dataclass
 class CodingAgentPresetConfig:
     """Configuration for the coding-agent preset."""
@@ -197,28 +219,41 @@ class CodingAgentPreset:
         """Classify or accept a source type, then compress with the matching route."""
         metadata = dict(metadata or {})
         source = self._resolve_source_type(source_type, text, metadata)
-        if source != "source_code" and self._looks_like_source_code(text):
+        if source not in {"source_code", "file_reads"} and self._looks_like_source_code(text):
             source = "source_code"
 
         context = str(metadata.get("context") or metadata.get("query") or "")
-        if source == "test_log":
+        if source in {"test_log", "test_logs"}:
             result = self._compress_log(source, text, metadata, context)
-        elif source == "build_log":
+        elif source in {"build_log", "build_logs"}:
             result = self._compress_log(source, text, metadata, context)
         elif source == "search_results":
             result = self._compress_search(text, metadata, context)
-        elif source == "file_tree":
-            result = self._compress_file_tree(text, metadata, context)
-        elif source == "git_diff":
-            result = self._compress_diff(text, metadata, context)
+        elif source in {"file_tree", "file_trees"}:
+            result = self._compress_file_tree(source, text, metadata, context)
+        elif source in {"git_diff", "git_diffs"}:
+            result = self._compress_diff(source, text, metadata, context)
+        elif source == "file_reads":
+            result = self._compress_file_read(text, metadata)
         elif source in {"package_metadata", "lockfile"}:
             result = self._compress_package_metadata(source, text, metadata)
-        elif source in {"mcp_tool_response", "api_db_response"}:
+        elif source in {"mcp_tool_response", "api_db_response", "api_db_responses", "mcp_schemas"}:
             result = self._compress_mcp_tool_response(source, text, metadata)
+        elif source == "tool_definitions":
+            result = self._compress_tool_definitions(source, text, metadata)
         elif source == "schema_or_openapi":
             result = self._compress_generic_tool_output(source, text, metadata)
         elif source == "source_code":
             result = self._passthrough_source_code(text, metadata)
+        elif source in {
+            "tool_outputs",
+            "rag_chunks",
+            "conversation_history_residue",
+            "agent_memory_files",
+            "ccr_retrievals",
+            "sandbox_artifacts",
+        }:
+            result = self._compress_generic_tool_output(source, text, metadata)
         else:
             result = self._compress_generic_tool_output("generic_tool_output", text, metadata)
         self._emit_ledger_event(result, metadata)
@@ -375,6 +410,7 @@ class CodingAgentPreset:
 
     def _compress_file_tree(
         self,
+        source_type: str,
         text: str,
         metadata: dict[str, Any],
         context: str,
@@ -395,7 +431,7 @@ class CodingAgentPreset:
         return self._result(
             compressed=result.compressed,
             original=text,
-            source_type="file_tree",
+            source_type=source_type,
             compression_method="file_tree_compressor",
             accuracy_guard="edit_target_tree_evidence",
             extra_metadata={
@@ -408,6 +444,7 @@ class CodingAgentPreset:
 
     def _compress_diff(
         self,
+        source_type: str,
         text: str,
         metadata: dict[str, Any],
         context: str,
@@ -418,7 +455,7 @@ class CodingAgentPreset:
         return self._result(
             compressed=result.compressed,
             original=text,
-            source_type="git_diff",
+            source_type=source_type,
             compression_method="diff_compressor",
             accuracy_guard="edit_target_diff_evidence",
             extra_metadata={
@@ -429,6 +466,22 @@ class CodingAgentPreset:
                 "deletions": result.deletions,
             },
         )
+
+    def _compress_file_read(
+        self,
+        text: str,
+        metadata: dict[str, Any],
+    ) -> CodingAgentPresetResult:
+        if self._looks_like_source_code(text):
+            return self._result(
+                compressed=text,
+                original=text,
+                source_type="file_reads",
+                compression_method="source_code_passthrough",
+                accuracy_guard="source_code_not_blindly_compressed",
+                extra_metadata={**metadata, "bypass_reason": "file_read_source_preserved"},
+            )
+        return self._compress_generic_tool_output("file_reads", text, metadata)
 
     def _compress_package_metadata(
         self,
@@ -462,6 +515,79 @@ class CodingAgentPreset:
             explicit_ccr_hash=ccr_hash,
             explicit_ccr_marker=ccr_marker,
         )
+
+    def _compress_tool_definitions(
+        self,
+        source_type: str,
+        text: str,
+        metadata: dict[str, Any],
+    ) -> CodingAgentPresetResult:
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return self._compress_generic_tool_output(source_type, text, metadata)
+
+        lines = ["tool_definitions:"]
+        seen: set[str] = set()
+        for item in self._walk_tool_schema_objects(parsed):
+            name = item.get("name")
+            if isinstance(name, str) and f"name:{name}" not in seen:
+                lines.append(f"name: {name}")
+                seen.add(f"name:{name}")
+            function = item.get("function")
+            if isinstance(function, dict):
+                function_name = function.get("name")
+                if isinstance(function_name, str) and f"name:{function_name}" not in seen:
+                    lines.append(f"name: {function_name}")
+                    seen.add(f"name:{function_name}")
+                item = function
+            description = item.get("description")
+            if isinstance(description, str) and len(lines) < 12:
+                lines.append(f"description: {description[:180]}")
+            parameters = item.get("parameters") or item.get("input_schema") or item.get("schema")
+            if isinstance(parameters, dict):
+                required = parameters.get("required")
+                if isinstance(required, list):
+                    lines.append("required: " + ", ".join(str(value) for value in required))
+                properties = parameters.get("properties")
+                if isinstance(properties, dict):
+                    lines.append(
+                        "parameters: " + ", ".join(str(key) for key in sorted(properties)[:20])
+                    )
+
+        if len(lines) == 1:
+            return self._compress_generic_tool_output(source_type, text, metadata)
+
+        omitted = max(0, _json_node_count(parsed) - len(lines))
+        compressed = "\n".join(lines)
+        compressed, ccr_hash, ccr_marker = self._append_ccr_if_needed(
+            original=text,
+            compressed=compressed,
+            omitted_count=omitted,
+            compression_strategy="coding_agent_tool_definitions",
+        )
+        return self._result(
+            compressed=compressed,
+            original=text,
+            source_type=source_type,
+            compression_method="tool_definition_schema_compactor",
+            accuracy_guard="tool_schema_name_required_parameters",
+            extra_metadata={**metadata, "omitted_items": omitted},
+            explicit_ccr_hash=ccr_hash,
+            explicit_ccr_marker=ccr_marker,
+        )
+
+    def _walk_tool_schema_objects(self, value: Any) -> list[dict[str, Any]]:
+        objects: list[dict[str, Any]] = []
+        if isinstance(value, dict):
+            if {"name", "function", "parameters", "input_schema", "schema"} & set(value):
+                objects.append(value)
+            for child in value.values():
+                objects.extend(self._walk_tool_schema_objects(child))
+        elif isinstance(value, list):
+            for child in value:
+                objects.extend(self._walk_tool_schema_objects(child))
+        return objects
 
     def _compact_package_json(
         self,

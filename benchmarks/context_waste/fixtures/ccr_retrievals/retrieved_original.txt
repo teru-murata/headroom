@@ -1,0 +1,11 @@
+﻿ccr_hash=abcdefabcdefabcdefabcdef
+retrieved_count=1
+source_type=test_logs
+source_path=tests/test_checkout.py
+tests/test_checkout.py:42 AssertionError: assert Decimal("9.99") == Decimal("10.00")
+restored line repeated: pytest captured local vars
+restored line repeated: pytest captured local vars
+restored line repeated: pytest captured local vars
+restored line repeated: pytest captured local vars
+restored line repeated: pytest captured local vars
+exit code: 0

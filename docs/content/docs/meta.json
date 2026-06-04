@@ -18,6 +18,7 @@
     "acceptance-evidence",
     "---Cache & Context---",
     "cache-optimization",
+    "context-waste-benchmark",
     "context-management",
     "---Memory---",
     "memory",

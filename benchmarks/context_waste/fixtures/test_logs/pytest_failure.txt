@@ -1,0 +1,32 @@
+$ python -m pytest tests/test_checkout.py::test_discount_rounding -q
+PASSED tests/test_checkout.py::test_noise_001
+PASSED tests/test_checkout.py::test_noise_002
+PASSED tests/test_checkout.py::test_noise_003
+PASSED tests/test_checkout.py::test_noise_004
+PASSED tests/test_checkout.py::test_noise_005
+PASSED tests/test_checkout.py::test_noise_006
+PASSED tests/test_checkout.py::test_noise_007
+PASSED tests/test_checkout.py::test_noise_008
+PASSED tests/test_checkout.py::test_noise_009
+PASSED tests/test_checkout.py::test_noise_010
+PASSED tests/test_checkout.py::test_noise_011
+PASSED tests/test_checkout.py::test_noise_012
+PASSED tests/test_checkout.py::test_noise_013
+PASSED tests/test_checkout.py::test_noise_014
+PASSED tests/test_checkout.py::test_noise_015
+FAILED tests/test_checkout.py::test_discount_rounding - AssertionError
+Traceback (most recent call last):
+  File "tests/test_checkout.py", line 42, in test_discount_rounding
+    assert Decimal("9.99") == Decimal("10.00")
+AssertionError: assert Decimal("9.99") == Decimal("10.00")
+PASSED tests/test_checkout.py::test_noise_016
+PASSED tests/test_checkout.py::test_noise_017
+PASSED tests/test_checkout.py::test_noise_018
+PASSED tests/test_checkout.py::test_noise_019
+PASSED tests/test_checkout.py::test_noise_020
+PASSED tests/test_checkout.py::test_noise_021
+PASSED tests/test_checkout.py::test_noise_022
+PASSED tests/test_checkout.py::test_noise_023
+short test summary info
+FAILED tests/test_checkout.py::test_discount_rounding
+exit code: 1

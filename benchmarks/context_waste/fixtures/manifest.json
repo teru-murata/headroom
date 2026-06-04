@@ -1,0 +1,169 @@
+{
+  "benchmark_version": "context-waste-benchmark-v0",
+  "fixtures": [
+    {
+      "id": "tool-definitions-openai-anthropic",
+      "source_type": "tool_definitions",
+      "path": "tool_definitions/openai_anthropic_tools.json",
+      "description": "Synthetic tool definitions with concise and noisy schemas.",
+      "expected_behavior": "preserve tool names, parameter names, required fields, and safety-relevant descriptions; collapse repeated schema boilerplate",
+      "must_preserve": ["checkout.lookup", "required", "customer_id"],
+      "may_collapse": ["x-generated-doc"]
+    },
+    {
+      "id": "mcp-schemas-repeated-boilerplate",
+      "source_type": "mcp_schemas",
+      "path": "mcp_schemas/repeated_schema.json",
+      "description": "Synthetic MCP schema/config output with repeated boilerplate.",
+      "expected_behavior": "preserve tool name, status, arguments, error/result counts, and first useful schema entries",
+      "must_preserve": ["tool: mcp.schema.list", "status: success", "result_count:"],
+      "may_collapse": ["MCP result objects omitted"],
+      "metadata": {"tool_name": "mcp.schema.list"}
+    },
+    {
+      "id": "tool-outputs-noisy-command",
+      "source_type": "tool_outputs",
+      "path": "tool_outputs/noisy_command.txt",
+      "description": "Generic command output with progress noise, warning, error, paths, and exit status.",
+      "expected_behavior": "preserve command, warning, file path, assertion, and exit code; collapse progress noise",
+      "must_preserve": ["$ npm run generate && npm run check", "src/server/auth.ts:214:19 ERROR", "exit code: 2"],
+      "may_collapse": ["download package"]
+    },
+    {
+      "id": "build-log-typescript",
+      "source_type": "build_logs",
+      "path": "build_logs/typescript_build.txt",
+      "description": "Synthetic TypeScript build log with install noise and root-cause compiler error.",
+      "expected_behavior": "route through log compressor and preserve root cause",
+      "must_preserve": ["$ npm ci && npm run build", "src/server/auth.ts:214:19 - error TS2345", "exit code: 2"],
+      "may_collapse": ["npm http fetch GET 200"]
+    },
+    {
+      "id": "test-log-pytest",
+      "source_type": "test_logs",
+      "path": "test_logs/pytest_failure.txt",
+      "description": "Synthetic pytest failure with traceback and passing-test noise.",
+      "expected_behavior": "route through log compressor and preserve failed test, assertion, file:line, command, and exit code",
+      "must_preserve": ["$ python -m pytest tests/test_checkout.py::test_discount_rounding -q", "FAILED tests/test_checkout.py::test_discount_rounding", "tests/test_checkout.py"],
+      "may_collapse": ["PASSED tests/test_checkout.py::test_noise_"]
+    },
+    {
+      "id": "search-results-rg",
+      "source_type": "search_results",
+      "path": "search_results/rg_results.txt",
+      "description": "Ripgrep-like output with repeated matches across source and tests.",
+      "expected_behavior": "route through search compressor and preserve query, files, line numbers, and relevant matches",
+      "must_preserve": ["$ rg \"requireUser|CheckoutSummary\" -n src tests packages", "src/server/auth.ts:", "tests/server/auth.test.ts:"],
+      "metadata": {"query": "requireUser CheckoutSummary", "context": "auth checkout"}
+    },
+    {
+      "id": "file-read-source-code",
+      "source_type": "file_reads",
+      "path": "file_reads/source_code.py",
+      "description": "Source file read that should be preserved rather than blindly compressed.",
+      "expected_behavior": "bypass compression and preserve source code verbatim",
+      "must_preserve": ["def calculate_discount", "return total - discount"],
+      "metadata": {"filename": "checkout/pricing.py"}
+    },
+    {
+      "id": "file-read-generated-vendor",
+      "source_type": "file_reads",
+      "path": "file_reads/generated_vendor.txt",
+      "description": "Generated/vendor file read with repeated blocks and a useful header.",
+      "expected_behavior": "collapse repeated generated noise or bypass with an explicit preservation guard",
+      "must_preserve": ["generated-client.txt", "schema_version=2026-06-04"],
+      "may_collapse": ["field repeated boilerplate"]
+    },
+    {
+      "id": "file-tree-repository",
+      "source_type": "file_trees",
+      "path": "file_trees/repository_tree.txt",
+      "description": "Repository tree with package roots, config files, source/test shape, and generated directories.",
+      "expected_behavior": "route through file-tree compressor and preserve package roots, config files, source/test shape, and referenced paths",
+      "must_preserve": ["package.json", "pyproject.toml", "|-- src/", "|-- tests/"],
+      "may_collapse": ["generated/package_010"],
+      "metadata": {"context": "src/server/auth.ts tests/checkout/session.test.ts"}
+    },
+    {
+      "id": "git-diff-auth-patch",
+      "source_type": "git_diffs",
+      "path": "git_diffs/auth_patch.diff",
+      "description": "Git diff with file status, hunk headers, changed symbols, imports, and test impact.",
+      "expected_behavior": "route through diff compressor and preserve file paths, status, hunk headers, symbols, imports, and tests",
+      "must_preserve": ["diff --git a/src/server/auth.ts b/src/server/auth.ts", "@@ -1,8 +1,12 @@", "+export function requireUser", "tests/server/auth.test.ts"],
+      "metadata": {"context": "requireUser auth tests"}
+    },
+    {
+      "id": "rag-chunks-overlap",
+      "source_type": "rag_chunks",
+      "path": "rag_chunks/overlapping_docs.txt",
+      "description": "Synthetic retrieved documentation chunks with overlapping boilerplate.",
+      "expected_behavior": "preserve document IDs, relevant snippets, and retrieval scores; collapse boilerplate",
+      "must_preserve": ["doc_id=auth-guide", "score=0.91", "requireUser"],
+      "may_collapse": ["Standard footer"]
+    },
+    {
+      "id": "api-db-response-orders",
+      "source_type": "api_db_responses",
+      "path": "api_db_responses/orders.json",
+      "description": "Synthetic API/database response with repeated fields and one error row.",
+      "expected_behavior": "preserve status, result count, first useful rows, error/status evidence, and path-like IDs",
+      "must_preserve": ["tool: db.query", "status: success", "result_count:"],
+      "metadata": {"tool_name": "db.query"}
+    },
+    {
+      "id": "conversation-history-residue",
+      "source_type": "conversation_history_residue",
+      "path": "conversation_history_residue/older_turns.txt",
+      "description": "Synthetic older turn residue kept only for benchmark measurement.",
+      "expected_behavior": "preserve command/result evidence and collapse repeated stale conversation residue without implementing compaction",
+      "must_preserve": ["turn_id=42", "src/server/auth.ts", "exit code: 1"],
+      "may_collapse": ["older plan repeated"]
+    },
+    {
+      "id": "agent-memory-files",
+      "source_type": "agent_memory_files",
+      "path": "agent_memory_files/AGENTS.md",
+      "description": "Synthetic AGENTS/CLAUDE/GEMINI-style instruction file.",
+      "expected_behavior": "preserve repository rules, test command, and safety boundaries; collapse repeated reminders",
+      "must_preserve": ["Do not touch billing", "python -m pytest tests/test_checkout.py", "Loopback retrieve guard must remain enabled"],
+      "may_collapse": ["Reminder repeated"]
+    },
+    {
+      "id": "ccr-retrieval-output",
+      "source_type": "ccr_retrievals",
+      "path": "ccr_retrievals/retrieved_original.txt",
+      "description": "Synthetic retrieved-original record from a local CCR lookup.",
+      "expected_behavior": "preserve marker hash, retrieval status, source path, and first restored evidence",
+      "must_preserve": ["ccr_hash=abcdefabcdefabcdefabcdef", "retrieved_count=1", "tests/test_checkout.py:42"],
+      "may_collapse": ["restored line repeated"]
+    },
+    {
+      "id": "sandbox-artifact-summary",
+      "source_type": "sandbox_artifacts",
+      "path": "sandbox_artifacts/execution_summary.txt",
+      "description": "Synthetic sandbox/code-execution artifact summary with raw artifact kept out-of-band.",
+      "expected_behavior": "preserve artifact id, exit code, kept-out path, and diagnostic line; collapse raw artifact preview",
+      "must_preserve": ["artifact_id=sandbox-run-17", "exit code: 1", ".headroom/artifacts/sandbox-run-17/raw.log"],
+      "may_collapse": ["raw artifact preview"]
+    },
+    {
+      "id": "package-metadata-package-json",
+      "source_type": "package_metadata",
+      "path": "package_metadata/package.json",
+      "description": "Compatibility fixture for H006 package metadata routing.",
+      "expected_behavior": "preserve scripts, dependencies, dev dependencies, and toolchain hints",
+      "must_preserve": ["name: @acme/checkout-web", "- build: tsc -b && vite build", "dependencies (8):"],
+      "metadata": {"filename": "package.json"}
+    },
+    {
+      "id": "mcp-tool-response-search",
+      "source_type": "mcp_tool_response",
+      "path": "mcp_tool_response/search_response.json",
+      "description": "Compatibility fixture for H006 MCP tool response routing.",
+      "expected_behavior": "preserve tool status, error, count, and first results; collapse excess result objects",
+      "must_preserve": ["tool: repo.search", "status: error", "result_count:"],
+      "metadata": {"tool_name": "repo.search"}
+    }
+  ]
+}

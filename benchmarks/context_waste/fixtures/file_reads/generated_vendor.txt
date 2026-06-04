@@ -1,0 +1,14 @@
+﻿generated-client.txt
+schema_version=2026-06-04
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+field repeated boilerplate: customer.id string optional generated
+src/generated/client.ts:88: warning generated field has deprecated alias
+exit code: 0

@@ -1,0 +1,16 @@
+﻿{
+  "tool": "mcp.schema.list",
+  "status": "success",
+  "arguments": {"server": "filesystem", "include_generated": true},
+  "count": 8,
+  "results": [
+    {"name": "read_file", "path": "tools/read_file.schema.json", "required": ["path"]},
+    {"name": "write_file", "path": "tools/write_file.schema.json", "required": ["path", "content"]},
+    {"name": "list_dir", "path": "tools/list_dir.schema.json", "required": ["path"]},
+    {"name": "grep", "path": "tools/grep.schema.json", "required": ["query"]},
+    {"name": "schema_001", "boilerplate": "Repeated MCP schema boilerplate for generated docs."},
+    {"name": "schema_002", "boilerplate": "Repeated MCP schema boilerplate for generated docs."},
+    {"name": "schema_003", "boilerplate": "Repeated MCP schema boilerplate for generated docs."},
+    {"name": "schema_004", "boilerplate": "Repeated MCP schema boilerplate for generated docs."}
+  ]
+}

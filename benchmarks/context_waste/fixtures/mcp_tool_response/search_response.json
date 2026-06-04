@@ -1,0 +1,18 @@
+﻿{
+  "tool": "repo.search",
+  "status": "error",
+  "arguments": {"query": "requireUser", "root": "."},
+  "error": "Permission denied reading src/server/secret.ts",
+  "count": 9,
+  "results": [
+    {"path": "src/server/auth.ts", "line": 12, "text": "export function requireUser(userId: string)"},
+    {"path": "tests/server/auth.test.ts", "line": 20, "text": "expect(() => requireUser('')).toThrow()"},
+    {"resource_id": "file:src/server/auth.ts", "status": "partial"},
+    {"path": "generated/noise_001.ts", "line": 1, "text": "requireUser generated placeholder"},
+    {"path": "generated/noise_002.ts", "line": 1, "text": "requireUser generated placeholder"},
+    {"path": "generated/noise_003.ts", "line": 1, "text": "requireUser generated placeholder"},
+    {"path": "generated/noise_004.ts", "line": 1, "text": "requireUser generated placeholder"},
+    {"path": "generated/noise_005.ts", "line": 1, "text": "requireUser generated placeholder"},
+    {"path": "generated/noise_006.ts", "line": 1, "text": "requireUser generated placeholder"}
+  ]
+}
