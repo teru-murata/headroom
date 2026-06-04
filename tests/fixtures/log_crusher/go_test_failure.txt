@@ -1,0 +1,29 @@
+$ go test ./...
+ok github.com/acme/agent/config 0.034s
+ok github.com/acme/agent/db 0.041s
+ok github.com/acme/agent/http 0.039s
+ok github.com/acme/agent/noise01 0.010s
+ok github.com/acme/agent/noise02 0.010s
+ok github.com/acme/agent/noise03 0.010s
+ok github.com/acme/agent/noise04 0.010s
+ok github.com/acme/agent/noise05 0.010s
+ok github.com/acme/agent/noise06 0.010s
+ok github.com/acme/agent/noise07 0.010s
+ok github.com/acme/agent/noise08 0.010s
+ok github.com/acme/agent/noise09 0.010s
+ok github.com/acme/agent/noise10 0.010s
+ok github.com/acme/agent/noise11 0.010s
+ok github.com/acme/agent/noise12 0.010s
+ok github.com/acme/agent/noise13 0.010s
+ok github.com/acme/agent/noise14 0.010s
+ok github.com/acme/agent/noise15 0.010s
+ok github.com/acme/agent/noise16 0.010s
+ok github.com/acme/agent/noise17 0.010s
+ok github.com/acme/agent/noise18 0.010s
+ok github.com/acme/agent/noise19 0.010s
+ok github.com/acme/agent/noise20 0.010s
+--- FAIL: TestRetryBackoff (0.00s)
+    retry/retry_test.go:87: expected delay 200ms, got 20ms
+FAIL
+FAIL github.com/acme/agent/retry 0.013s
+exit code: 1

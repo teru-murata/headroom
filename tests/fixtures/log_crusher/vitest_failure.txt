@@ -1,0 +1,31 @@
+$ npm test -- --run src/cart.test.ts
+> storefront@1.2.0 test
+> vitest run src/cart.test.ts
+RUN v2.1.9 C:/work/storefront
+PASS src/product.test.ts > product cards > renders name 1
+PASS src/product.test.ts > product cards > renders name 2
+PASS src/product.test.ts > product cards > renders name 3
+PASS src/product.test.ts > product cards > renders name 4
+PASS src/product.test.ts > product cards > renders name 5
+PASS src/product.test.ts > product cards > renders name 6
+PASS src/product.test.ts > product cards > renders name 7
+PASS src/product.test.ts > product cards > renders name 8
+PASS src/product.test.ts > product cards > renders name 9
+PASS src/product.test.ts > product cards > renders name 10
+PASS src/product.test.ts > product cards > renders name 11
+PASS src/product.test.ts > product cards > renders name 12
+PASS src/product.test.ts > product cards > renders name 13
+PASS src/product.test.ts > product cards > renders name 14
+PASS src/product.test.ts > product cards > renders name 15
+PASS src/product.test.ts > product cards > renders name 16
+PASS src/product.test.ts > product cards > renders name 17
+PASS src/product.test.ts > product cards > renders name 18
+PASS src/product.test.ts > product cards > renders name 19
+PASS src/product.test.ts > product cards > renders name 20
+FAIL src/cart.test.ts > cart totals > applies shipping discount
+AssertionError: expected 19.99 to be 14.99
+    at src/cart.test.ts:88:21
+    at runTest node_modules/vitest/dist/chunk-runner.js:781:11
+Test Files 1 failed | 8 passed
+Tests 1 failed | 124 passed
+exit code: 1

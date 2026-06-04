@@ -1,0 +1,35 @@
+$ cargo test -p checkout
+Compiling checkout v0.4.0 (crates/checkout)
+Compiling checkout-support v0.4.0 (crates/checkout-support)
+Finished test profile [unoptimized + debuginfo] target(s) in 2.91s
+running 40 tests
+test checkout::tests::smoke_01 ... ok
+test checkout::tests::smoke_02 ... ok
+test checkout::tests::smoke_03 ... ok
+test checkout::tests::smoke_04 ... ok
+test checkout::tests::smoke_05 ... ok
+test checkout::tests::smoke_06 ... ok
+test checkout::tests::smoke_07 ... ok
+test checkout::tests::smoke_08 ... ok
+test checkout::tests::smoke_09 ... ok
+test checkout::tests::smoke_10 ... ok
+test checkout::tests::smoke_11 ... ok
+test checkout::tests::smoke_12 ... ok
+test checkout::tests::smoke_13 ... ok
+test checkout::tests::smoke_14 ... ok
+test checkout::tests::smoke_15 ... ok
+test checkout::tests::smoke_16 ... ok
+test checkout::tests::smoke_17 ... ok
+test checkout::tests::smoke_18 ... ok
+test checkout::tests::smoke_19 ... ok
+test checkout::tests::smoke_20 ... ok
+test checkout::tests::applies_tax ... FAILED
+failures:
+---- checkout::tests::applies_tax stdout ----
+thread 'checkout::tests::applies_tax' panicked at 'assertion failed: left == right', crates/checkout/src/lib.rs:128:9
+left: 1999
+right: 2099
+failures:
+    checkout::tests::applies_tax
+test result: FAILED. 39 passed; 1 failed; 0 ignored; finished in 0.44s
+exit code: 101

@@ -1,0 +1,40 @@
+$ python -m pytest tests/test_checkout.py::test_discount_rounding -q
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.3.5
+collected 42 items
+tests/test_checkout.py::test_pass_001 PASSED
+tests/test_checkout.py::test_pass_002 PASSED
+tests/test_checkout.py::test_pass_003 PASSED
+tests/test_checkout.py::test_pass_004 PASSED
+tests/test_checkout.py::test_pass_005 PASSED
+tests/test_checkout.py::test_pass_006 PASSED
+tests/test_checkout.py::test_pass_007 PASSED
+tests/test_checkout.py::test_pass_008 PASSED
+tests/test_checkout.py::test_pass_009 PASSED
+tests/test_checkout.py::test_pass_010 PASSED
+tests/test_checkout.py::test_pass_011 PASSED
+tests/test_checkout.py::test_pass_012 PASSED
+tests/test_checkout.py::test_pass_013 PASSED
+tests/test_checkout.py::test_pass_014 PASSED
+tests/test_checkout.py::test_pass_015 PASSED
+tests/test_checkout.py::test_pass_016 PASSED
+tests/test_checkout.py::test_pass_017 PASSED
+tests/test_checkout.py::test_pass_018 PASSED
+tests/test_checkout.py::test_pass_019 PASSED
+tests/test_checkout.py::test_pass_020 PASSED
+tests/test_checkout.py::test_pass_021 PASSED
+tests/test_checkout.py::test_pass_022 PASSED
+tests/test_checkout.py::test_pass_023 PASSED
+tests/test_checkout.py::test_pass_024 PASSED
+tests/test_checkout.py::test_pass_025 PASSED
+=================================== FAILURES ===================================
+___________________________ test_discount_rounding ____________________________
+tests/test_checkout.py:42: in test_discount_rounding
+    assert total == Decimal("10.00")
+E   AssertionError: assert Decimal("9.99") == Decimal("10.00")
+E    +  where Decimal("9.99") = invoice.total
+FAILED tests/test_checkout.py::test_discount_rounding - AssertionError: expected 10.00
+=========================== short test summary info ===========================
+FAILED tests/test_checkout.py::test_discount_rounding - AssertionError
+1 failed, 41 passed in 2.03s
+exit code: 1

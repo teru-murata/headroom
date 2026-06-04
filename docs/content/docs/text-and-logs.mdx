@@ -85,11 +85,17 @@ print(f"Compression ratio: {result.compression_ratio:.1%}")
 - Full stack traces for debugging
 - Test/build summary lines
 - Section headers (structural markers like `=====`)
+- Coding-agent failure evidence: original command, exit code, failed test name,
+  assertion/build diagnostic, and relevant file/line references
 
 **What gets dropped:**
 - Hundreds of `PASSED` lines
 - Verbose success output
 - Repeated patterns
+
+When CCR is enabled and the log is large enough to emit a retrieve marker, the
+omitted original remains retrievable through Headroom's local CCR store while
+the entry is available.
 
 ## DiffCompressor
 

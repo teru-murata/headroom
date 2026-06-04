@@ -1,0 +1,31 @@
+$ mvn test -pl billing-service
+[INFO] Scanning for projects...
+[INFO] Downloading dependency-001.pom
+[INFO] Downloading dependency-002.pom
+[INFO] Downloading dependency-003.pom
+[INFO] Downloading dependency-004.pom
+[INFO] Downloading dependency-005.pom
+[INFO] Downloading dependency-006.pom
+[INFO] Downloading dependency-007.pom
+[INFO] Downloading dependency-008.pom
+[INFO] Downloading dependency-009.pom
+[INFO] Downloading dependency-010.pom
+[INFO] Downloading dependency-011.pom
+[INFO] Downloading dependency-012.pom
+[INFO] Downloading dependency-013.pom
+[INFO] Downloading dependency-014.pom
+[INFO] Downloading dependency-015.pom
+[INFO] Downloading dependency-016.pom
+[INFO] Downloading dependency-017.pom
+[INFO] Downloading dependency-018.pom
+[INFO] Downloading dependency-019.pom
+[INFO] Downloading dependency-020.pom
+[INFO] Running com.acme.billing.PaymentServiceTest
+[ERROR] Tests run: 12, Failures: 1, Errors: 0, Skipped: 0
+[ERROR]   PaymentServiceTest.appliesDiscount:57 expected:<10.00> but was:<9.99>
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project billing-service: There are test failures.
+[ERROR] Please refer to C:/work/billing-service/target/surefire-reports for the individual test results.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+exit code: 1

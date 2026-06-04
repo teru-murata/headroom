@@ -43,6 +43,7 @@ exists only for unit testing.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, cast
@@ -147,6 +148,128 @@ def _format_from_str(name: str) -> LogFormat:
     }.get(name, LogFormat.GENERIC)
 
 
+_MAX_EVIDENCE_LINES = 48
+
+_COMMAND_RE = re.compile(
+    r"^\s*(?:\$|>|command:|cmd:|running command:|original command:)\s+.+",
+    re.IGNORECASE,
+)
+_EXIT_CODE_RE = re.compile(
+    r"\b(?:exit code|exited with code|process completed with exit code|returned non-zero)\b"
+    r".*?\b\d+\b",
+    re.IGNORECASE,
+)
+_FILE_LINE_RE = re.compile(
+    r"(?:[A-Za-z]:)?(?:[\\/][A-Za-z0-9_.@+ -]+)+:\d+(?::\d+)?"
+    r"|[A-Za-z0-9_.@+-]+(?:[\\/][A-Za-z0-9_.@+-]+)+:\d+(?::\d+)?"
+    r"|[A-Za-z0-9_.@+-]+\.(?:py|js|jsx|ts|tsx|go|rs|java|kt|c|cc|cpp|h|hpp|cs|rb|php):"
+    r"\d+(?::\d+)?"
+)
+_PYTHON_FILE_FRAME_RE = re.compile(r'^\s*File "[^"]+", line \d+')
+_FAILED_TEST_RE = re.compile(
+    r"^\s*(?:FAILED\s+\S+|FAIL\s+\S+|--- FAIL:|test\s+\S+\s+\.\.\.\s+FAILED|"
+    r"\[ERROR\]\s+\S+\.\S+:\d+|>\s*Task\s+\S+\s+FAILED)",
+    re.IGNORECASE,
+)
+_TRACE_RE = re.compile(
+    r"^\s*(?:Traceback \(most recent call last\)|at\s+\S+\(.+:\d+:\d+\)|"
+    r"Caused by:|goroutine\s+\d+|thread '.+' panicked at|-->\s+\S+:\d+:\d+|"
+    r"\d+:\s+0x[0-9A-Fa-f]+)"
+)
+_ROOT_CAUSE_RE = re.compile(
+    r"\b(?:AssertionError|assert\s+|expected|expect\(|received|panic|panicked|"
+    r"error\[[A-Za-z0-9_]+\]|Exception|TypeError|ValueError|"
+    r"BUILD FAILED|BUILD FAILURE|Failed to execute|There are test failures|FAILURE:)\b",
+    re.IGNORECASE,
+)
+_ERROR_DIAGNOSTIC_RE = re.compile(
+    r"\berror\b.*\b(?:failed|failure|exception|assert|expected|build|compile|"
+    r"type|assignable|diagnostic)\b",
+    re.IGNORECASE,
+)
+
+
+def _coding_agent_evidence_priority(line: str) -> int | None:
+    stripped = line.strip()
+    if not stripped:
+        return None
+    if _COMMAND_RE.search(stripped) or _EXIT_CODE_RE.search(stripped):
+        return 0
+    if (
+        _FAILED_TEST_RE.search(stripped)
+        or _TRACE_RE.search(stripped)
+        or _PYTHON_FILE_FRAME_RE.search(stripped)
+        or _ROOT_CAUSE_RE.search(stripped)
+        or _ERROR_DIAGNOSTIC_RE.search(stripped)
+    ):
+        return 1
+    if _FILE_LINE_RE.search(stripped):
+        return 2
+    return None
+
+
+def _extract_coding_agent_evidence_lines(content: str) -> list[str]:
+    candidates: list[tuple[int, int, str]] = []
+    seen: set[str] = set()
+    for index, line in enumerate(content.splitlines()):
+        normalized = line.rstrip()
+        if normalized in seen:
+            continue
+        priority = _coding_agent_evidence_priority(normalized)
+        if priority is None:
+            continue
+        candidates.append((priority, index, normalized))
+        seen.add(normalized)
+
+    if len(candidates) > _MAX_EVIDENCE_LINES:
+        candidates = sorted(candidates)[:_MAX_EVIDENCE_LINES]
+
+    return [line for _, _, line in sorted(candidates, key=lambda item: item[1])]
+
+
+def _split_trailing_ccr_marker(compressed: str) -> tuple[str, str | None]:
+    if "\n" not in compressed:
+        return compressed, None
+
+    body, tail = compressed.rsplit("\n", 1)
+    try:
+        from ..ccr.markers import parse_first_ccr_marker
+    except ImportError:
+        return compressed, None
+
+    if parse_first_ccr_marker(tail) is None:
+        return compressed, None
+    return body, tail
+
+
+def _preserve_coding_agent_evidence(
+    original: str,
+    compressed: str,
+) -> tuple[str, dict[str, int]]:
+    """Ensure compressed build/test logs retain failure-debugging evidence."""
+    evidence_lines = _extract_coding_agent_evidence_lines(original)
+    missing = [line for line in evidence_lines if line not in compressed]
+    if not missing:
+        return compressed, {
+            "evidence_guard_required": int(bool(evidence_lines)),
+            "evidence_guard_candidates": len(evidence_lines),
+            "evidence_guard_added": 0,
+            "evidence_guard_missing_after_guard": 0,
+        }
+
+    body, marker = _split_trailing_ccr_marker(compressed)
+    evidence_block = "\n".join(missing)
+    guarded_body = f"{evidence_block}\n{body}" if body else evidence_block
+    guarded = f"{guarded_body}\n{marker}" if marker is not None else guarded_body
+    still_missing = sum(1 for line in evidence_lines if line not in guarded)
+    return guarded, {
+        "evidence_guard_required": int(bool(evidence_lines)),
+        "evidence_guard_candidates": len(evidence_lines),
+        "evidence_guard_added": len(missing),
+        "evidence_guard_missing_after_guard": still_missing,
+    }
+
+
 class LogCompressor:
     """Rust-backed log compressor.
 
@@ -197,17 +320,26 @@ class LogCompressor:
         del context
         rust_result = self._rust.compress(content, bias)
         cache_key: str | None = rust_result.cache_key
+        compressed, evidence_stats = _preserve_coding_agent_evidence(
+            content,
+            rust_result.compressed,
+        )
         if cache_key is not None:
-            self._persist_to_python_ccr(content, rust_result.compressed, cache_key)
+            self._persist_to_python_ccr(content, compressed, cache_key)
 
         stats_dict = {k: int(v) for k, v in cast("dict[str, int]", rust_result.stats).items()}
+        # TODO(#19): route this guard metadata into the accuracy ledger
+        # once the ledger hook exists for transform-level compressors.
+        stats_dict.update(evidence_stats)
         return LogCompressionResult(
-            compressed=rust_result.compressed,
+            compressed=compressed,
             original=content,
             original_line_count=rust_result.original_line_count,
-            compressed_line_count=rust_result.compressed_line_count,
+            compressed_line_count=len(compressed.split("\n")),
             format_detected=_format_from_str(rust_result.format_detected),
-            compression_ratio=rust_result.compression_ratio,
+            compression_ratio=(
+                rust_result.compression_ratio if not content else len(compressed) / len(content)
+            ),
             cache_key=cache_key,
             stats=stats_dict,
         )
@@ -481,7 +613,12 @@ class LogCompressor:
             store: Any = get_compression_store()
             return cast(
                 "str | None",
-                store.store(original, compressed, original_item_count=original_count),
+                store.store(
+                    original,
+                    compressed,
+                    original_item_count=original_count,
+                    explicit_hash=cache_key,
+                ),
             )
         except Exception as e:
             logger.warning("CCR store write failed; cache_key %s not persisted: %s", cache_key, e)
@@ -497,7 +634,7 @@ class LogCompressor:
             return
         try:
             store: Any = get_compression_store()
-            store.store(original, compressed)
+            store.store(original, compressed, explicit_hash=cache_key)
         except Exception as e:
             logger.warning(
                 "CCR store write failed; cache_key %s remains in-marker only: %s",

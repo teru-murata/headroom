@@ -1,0 +1,29 @@
+$ npm ci && npm run build
+npm WARN deprecated left-pad@1.3.0: use String.prototype.padStart()
+npm http fetch GET 200 https://registry.npmjs.org/package-001 21ms
+npm http fetch GET 200 https://registry.npmjs.org/package-002 22ms
+npm http fetch GET 200 https://registry.npmjs.org/package-003 23ms
+npm http fetch GET 200 https://registry.npmjs.org/package-004 24ms
+npm http fetch GET 200 https://registry.npmjs.org/package-005 25ms
+npm http fetch GET 200 https://registry.npmjs.org/package-006 26ms
+npm http fetch GET 200 https://registry.npmjs.org/package-007 27ms
+npm http fetch GET 200 https://registry.npmjs.org/package-008 28ms
+npm http fetch GET 200 https://registry.npmjs.org/package-009 29ms
+npm http fetch GET 200 https://registry.npmjs.org/package-010 30ms
+npm http fetch GET 200 https://registry.npmjs.org/package-011 31ms
+npm http fetch GET 200 https://registry.npmjs.org/package-012 32ms
+npm http fetch GET 200 https://registry.npmjs.org/package-013 33ms
+npm http fetch GET 200 https://registry.npmjs.org/package-014 34ms
+npm http fetch GET 200 https://registry.npmjs.org/package-015 35ms
+npm http fetch GET 200 https://registry.npmjs.org/package-016 36ms
+npm http fetch GET 200 https://registry.npmjs.org/package-017 37ms
+npm http fetch GET 200 https://registry.npmjs.org/package-018 38ms
+npm http fetch GET 200 https://registry.npmjs.org/package-019 39ms
+npm http fetch GET 200 https://registry.npmjs.org/package-020 40ms
+> app@0.1.0 build
+> tsc -p tsconfig.json
+src/server/auth.ts:214:19 - error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+214     requireUser(session.user.id)
+                      ~~~~~~~~~~~~
+ERROR: build failed while compiling src/server/auth.ts
+exit code: 2

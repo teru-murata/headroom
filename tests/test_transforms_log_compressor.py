@@ -150,7 +150,7 @@ def test_store_in_ccr_and_result_properties(monkeypatch: pytest.MonkeyPatch) -> 
         "headroom.cache.compression_store",
         SimpleNamespace(
             get_compression_store=lambda: SimpleNamespace(
-                store=lambda original, compressed, original_item_count=0: "stored-log"
+                store=lambda original, compressed, **kwargs: "stored-log"
             )
         ),
     )
