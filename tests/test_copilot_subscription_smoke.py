@@ -57,21 +57,24 @@ def test_env_token_resolves_subscription_without_secret_store(
 ) -> None:
     _stub_all_secret_stores(monkeypatch)
     _clear_token_env(monkeypatch)
-    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "gho-env-universal")
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "fake-env-universal-token")
     monkeypatch.setattr(
         copilot_auth,
         "_fetch_copilot_user_info",
         lambda token: (
-            {"endpoints": {"api": BUSINESS_API}} if token == "gho-env-universal" else None
+            {"endpoints": {"api": BUSINESS_API}} if token == "fake-env-universal-token" else None
         ),
     )
 
-    assert copilot_auth.resolve_subscription_bearer_token() == "gho-env-universal"
+    assert copilot_auth.resolve_subscription_bearer_token() == "fake-env-universal-token"
     # Routing is override -> generic; the account host advertised by user-info is
     # NOT used (it regressed newer models on the responses API, #610). With no
     # GITHUB_COPILOT_API_URL pin set, the generic public host is returned.
     monkeypatch.delenv("GITHUB_COPILOT_API_URL", raising=False)
-    assert copilot_auth.resolve_copilot_api_url("gho-env-universal") == copilot_auth.DEFAULT_API_URL
+    assert (
+        copilot_auth.resolve_copilot_api_url("fake-env-universal-token")
+        == copilot_auth.DEFAULT_API_URL
+    )
 
 
 def test_api_url_falls_back_to_default_when_user_info_unavailable(
@@ -82,7 +85,7 @@ def test_api_url_falls_back_to_default_when_user_info_unavailable(
     monkeypatch.setattr(copilot_auth, "_fetch_copilot_user_info", lambda token: None)
 
     # No network / no endpoints advertised → safe default, never a crash.
-    assert copilot_auth.resolve_copilot_api_url("gho-anything") == copilot_auth.DEFAULT_API_URL
+    assert copilot_auth.resolve_copilot_api_url("fake-any-token") == copilot_auth.DEFAULT_API_URL
 
 
 def test_subscription_rejects_token_github_does_not_accept(
@@ -97,10 +100,12 @@ def test_subscription_rejects_token_github_does_not_accept(
         "iter_oauth_token_candidates",
         lambda: [
             copilot_auth.CopilotTokenCandidate(
-                token="ghp-generic-pat", source="env:GITHUB_TOKEN", confidence="generic-github"
+                token="fake-generic-github-token",
+                source="env:GITHUB_TOKEN",
+                confidence="generic-github",
             ),
             copilot_auth.CopilotTokenCandidate(
-                token="gho-real-copilot",
+                token="fake-real-copilot-token",
                 source="macos-keychain:copilot-cli",
                 confidence="high",
             ),
@@ -109,10 +114,12 @@ def test_subscription_rejects_token_github_does_not_accept(
     monkeypatch.setattr(
         copilot_auth,
         "_fetch_copilot_user_info",
-        lambda token: {"endpoints": {"api": BUSINESS_API}} if token == "gho-real-copilot" else None,
+        lambda token: (
+            {"endpoints": {"api": BUSINESS_API}} if token == "fake-real-copilot-token" else None
+        ),
     )
 
-    assert copilot_auth.resolve_subscription_bearer_token() == "gho-real-copilot"
+    assert copilot_auth.resolve_subscription_bearer_token() == "fake-real-copilot-token"
 
 
 # ---------------------------------------------------------------------------
@@ -148,13 +155,11 @@ def test_proxy_injects_explicit_token_over_discovered_one(
     # Reset the cached module-level provider so this test is self-contained.
     monkeypatch.setattr(copilot_auth, "_provider", None)
     # What `wrap copilot --subscription` exports for the proxy:
-    monkeypatch.setenv("GITHUB_COPILOT_API_TOKEN", "gho-validated")
+    monkeypatch.setenv("GITHUB_COPILOT_API_TOKEN", "fake-validated-token")
     monkeypatch.setenv("GITHUB_COPILOT_API_URL", BUSINESS_API)
     monkeypatch.setenv("GITHUB_COPILOT_USE_TOKEN_EXCHANGE", "false")
     # A *different* token is discoverable — it must be ignored entirely.
-    monkeypatch.setattr(
-        copilot_auth, "read_cached_oauth_token", lambda: "gho-WRONG-should-not-be-used"
-    )
+    monkeypatch.setattr(copilot_auth, "read_cached_oauth_token", lambda: "fake-wrong-token")
 
     headers = asyncio.run(
         copilot_auth.apply_copilot_api_auth(
@@ -163,7 +168,7 @@ def test_proxy_injects_explicit_token_over_discovered_one(
         )
     )
 
-    assert headers["Authorization"] == "Bearer gho-validated"
+    assert headers["Authorization"] == "Bearer fake-validated-token"
     assert "authorization" not in headers
 
 
@@ -180,20 +185,20 @@ def test_end_to_end_subscription_chain(monkeypatch: pytest.MonkeyPatch) -> None:
     #     ignored when picking the upstream.
     _stub_all_secret_stores(monkeypatch)
     _clear_token_env(monkeypatch)
-    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "gho-seat-token")
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "fake-seat-token")
     monkeypatch.setenv("GITHUB_COPILOT_API_URL", BUSINESS_API)
     monkeypatch.setattr(
         copilot_auth,
         "_fetch_copilot_user_info",
         lambda token: (
             {"endpoints": {"api": "https://api.individual.githubcopilot.com"}}
-            if token == "gho-seat-token"
+            if token == "fake-seat-token"
             else None
         ),
     )
     resolved_token = copilot_auth.resolve_subscription_bearer_token()
     resolved_url = copilot_auth.resolve_copilot_api_url(resolved_token)
-    assert resolved_token == "gho-seat-token"
+    assert resolved_token == "fake-seat-token"
     assert resolved_url == BUSINESS_API  # the pin wins; the user-info host is ignored
 
     # (b) hand-off: the wrapper exports exactly these for the proxy.

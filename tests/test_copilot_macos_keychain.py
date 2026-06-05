@@ -16,14 +16,16 @@ def test_read_copilot_oauth_token_uses_security(
         calls.append(command)
         assert kwargs["capture_output"] is True
         assert kwargs["timeout"] == 5
-        return SimpleNamespace(returncode=0, stdout="gho-keychain\n")
+        return SimpleNamespace(returncode=0, stdout="fake-keychain-token\n")
 
     monkeypatch.setattr(copilot_macos_keychain.sys, "platform", "darwin")
     monkeypatch.setenv("GITHUB_COPILOT_KEYCHAIN_SERVICE", "GitHub Copilot")
     monkeypatch.setenv("GITHUB_COPILOT_KEYCHAIN_ACCOUNT", "chopratejas")
     monkeypatch.setattr(copilot_macos_keychain.subprocess, "run", fake_run)
 
-    assert copilot_macos_keychain.read_copilot_oauth_token(host="github.com") == "gho-keychain"
+    assert (
+        copilot_macos_keychain.read_copilot_oauth_token(host="github.com") == "fake-keychain-token"
+    )
     assert calls[0] == ["security", "find-generic-password", "-s", "GitHub Copilot", "-w"]
 
 
@@ -68,7 +70,7 @@ def test_read_copilot_oauth_token_tries_copilot_cli_host_login_account(
 
     def fake_run(command: list[str], **kwargs: object) -> object:
         calls.append(command)
-        stdout = "gho-keychain\n" if command == expected else ""
+        stdout = "fake-keychain-token\n" if command == expected else ""
         return type("CompletedProcess", (), {"returncode": 0 if stdout else 44, "stdout": stdout})()
 
     expected = [
@@ -86,5 +88,7 @@ def test_read_copilot_oauth_token_tries_copilot_cli_host_login_account(
     monkeypatch.delenv("GITHUB_COPILOT_KEYCHAIN_ACCOUNT", raising=False)
     monkeypatch.setattr(copilot_macos_keychain.subprocess, "run", fake_run)
 
-    assert copilot_macos_keychain.read_copilot_oauth_token(host="github.com") == "gho-keychain"
+    assert (
+        copilot_macos_keychain.read_copilot_oauth_token(host="github.com") == "fake-keychain-token"
+    )
     assert expected in calls

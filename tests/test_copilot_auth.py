@@ -13,8 +13,8 @@ from headroom import copilot_auth
 
 
 def test_read_cached_oauth_token_prefers_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "gho-env")
-    assert copilot_auth.read_cached_oauth_token() == "gho-env"
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "fake-env-token")
+    assert copilot_auth.read_cached_oauth_token() == "fake-env-token"
 
 
 def test_read_cached_oauth_token_prefers_copilot_cli_before_generic_github_token(
@@ -23,12 +23,16 @@ def test_read_cached_oauth_token_prefers_copilot_cli_before_generic_github_token
     monkeypatch.delenv("GITHUB_COPILOT_GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GITHUB_COPILOT_TOKEN", raising=False)
     monkeypatch.delenv("COPILOT_GITHUB_TOKEN", raising=False)
-    monkeypatch.setenv("GITHUB_TOKEN", "ghp-generic")
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-generic-github-token")
     monkeypatch.setattr(copilot_auth, "_read_windows_copilot_cli_oauth_token", lambda: None)
-    monkeypatch.setattr(copilot_auth, "_read_macos_keychain_oauth_token", lambda: "gho-keychain")
+    monkeypatch.setattr(
+        copilot_auth,
+        "_read_macos_keychain_oauth_token",
+        lambda: "fake-keychain-token",
+    )
     monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: None)
 
-    assert copilot_auth.read_cached_oauth_token() == "gho-keychain"
+    assert copilot_auth.read_cached_oauth_token() == "fake-keychain-token"
 
 
 def test_iter_oauth_token_candidates_preserves_sources(
@@ -37,17 +41,21 @@ def test_iter_oauth_token_candidates_preserves_sources(
     monkeypatch.delenv("GITHUB_COPILOT_GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("GITHUB_COPILOT_TOKEN", raising=False)
     monkeypatch.delenv("COPILOT_GITHUB_TOKEN", raising=False)
-    monkeypatch.setenv("GITHUB_TOKEN", "ghp-generic")
+    monkeypatch.setenv("GITHUB_TOKEN", "fake-generic-github-token")
     monkeypatch.setattr(copilot_auth, "_read_windows_copilot_cli_oauth_token", lambda: None)
-    monkeypatch.setattr(copilot_auth, "_read_macos_keychain_oauth_token", lambda: "gho-keychain")
+    monkeypatch.setattr(
+        copilot_auth,
+        "_read_macos_keychain_oauth_token",
+        lambda: "fake-keychain-token",
+    )
     monkeypatch.setattr(copilot_auth, "_read_file_oauth_token_candidates", lambda: [])
     monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: None)
 
     candidates = copilot_auth.iter_oauth_token_candidates()
 
     assert [(candidate.source, candidate.token) for candidate in candidates] == [
-        ("macos-keychain:copilot-cli", "gho-keychain"),
-        ("env:GITHUB_TOKEN", "ghp-generic"),
+        ("macos-keychain:copilot-cli", "fake-keychain-token"),
+        ("env:GITHUB_TOKEN", "fake-generic-github-token"),
     ]
 
 
@@ -61,12 +69,12 @@ def test_resolve_subscription_bearer_token_skips_invalid_generic_token(
         "iter_oauth_token_candidates",
         lambda: [
             copilot_auth.CopilotTokenCandidate(
-                token="ghp-generic",
+                token="fake-generic-github-token",
                 source="env:GITHUB_TOKEN",
                 confidence="generic-github",
             ),
             copilot_auth.CopilotTokenCandidate(
-                token="gho-copilot",
+                token="fake-copilot-token",
                 source="macos-keychain:copilot-cli",
                 confidence="high",
             ),
@@ -77,12 +85,12 @@ def test_resolve_subscription_bearer_token_skips_invalid_generic_token(
         "_fetch_copilot_user_info",
         lambda token: (
             {"endpoints": {"api": "https://api.individual.githubcopilot.com"}}
-            if token == "gho-copilot"
+            if token == "fake-copilot-token"
             else None
         ),
     )
 
-    assert copilot_auth.resolve_subscription_bearer_token() == "gho-copilot"
+    assert copilot_auth.resolve_subscription_bearer_token() == "fake-copilot-token"
 
 
 def test_should_exchange_oauth_token_supports_truthy_values(
@@ -128,9 +136,9 @@ def test_read_cached_oauth_token_falls_back_to_gh_cli(monkeypatch: pytest.Monkey
     monkeypatch.delenv("COPILOT_GITHUB_TOKEN", raising=False)
     monkeypatch.setattr(copilot_auth, "_read_windows_copilot_cli_oauth_token", lambda: None)
     monkeypatch.setattr(copilot_auth, "_read_macos_keychain_oauth_token", lambda: None)
-    monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: "gho-gh-cli")
+    monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: "fake-gh-cli-token")
 
-    assert copilot_auth.read_cached_oauth_token() == "gho-gh-cli"
+    assert copilot_auth.read_cached_oauth_token() == "fake-gh-cli-token"
 
 
 def test_read_cached_oauth_token_prefers_copilot_cli_windows_token(
@@ -141,11 +149,13 @@ def test_read_cached_oauth_token_prefers_copilot_cli_windows_token(
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("COPILOT_GITHUB_TOKEN", raising=False)
     monkeypatch.setattr(
-        copilot_auth, "_read_windows_copilot_cli_oauth_token", lambda: "gho-copilot"
+        copilot_auth,
+        "_read_windows_copilot_cli_oauth_token",
+        lambda: "fake-copilot-token",
     )
-    monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: "gho-gh-cli")
+    monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: "fake-gh-cli-token")
 
-    assert copilot_auth.read_cached_oauth_token() == "gho-copilot"
+    assert copilot_auth.read_cached_oauth_token() == "fake-copilot-token"
 
 
 def test_read_cached_oauth_token_prefers_macos_keychain_before_gh(
@@ -157,10 +167,14 @@ def test_read_cached_oauth_token_prefers_macos_keychain_before_gh(
     monkeypatch.delenv("GH_TOKEN", raising=False)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.setattr(copilot_auth, "_read_windows_copilot_cli_oauth_token", lambda: None)
-    monkeypatch.setattr(copilot_auth, "_read_macos_keychain_oauth_token", lambda: "gho-keychain")
-    monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: "gho-gh-cli")
+    monkeypatch.setattr(
+        copilot_auth,
+        "_read_macos_keychain_oauth_token",
+        lambda: "fake-keychain-token",
+    )
+    monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: "fake-gh-cli-token")
 
-    assert copilot_auth.read_cached_oauth_token() == "gho-keychain"
+    assert copilot_auth.read_cached_oauth_token() == "fake-keychain-token"
 
 
 def test_read_macos_keychain_oauth_token_uses_security(
@@ -170,10 +184,10 @@ def test_read_macos_keychain_oauth_token_uses_security(
 
     def fake_read(*, host: str) -> str:
         calls.append(host)
-        return "gho-keychain"
+        return "fake-keychain-token"
 
     monkeypatch.setattr(copilot_auth, "read_macos_keychain_token", fake_read)
-    assert copilot_auth._read_macos_keychain_oauth_token() == "gho-keychain"
+    assert copilot_auth._read_macos_keychain_oauth_token() == "fake-keychain-token"
     assert calls == ["github.com"]
 
 
@@ -185,7 +199,7 @@ def test_read_cached_oauth_token_reads_hosts_file(
         json.dumps(
             {
                 "github.com": {
-                    "oauth_token": "gho-file",
+                    "oauth_token": "fake-file-token",
                     "expires_at": "2999-01-01T00:00:00Z",
                 }
             }
@@ -198,7 +212,7 @@ def test_read_cached_oauth_token_reads_hosts_file(
     monkeypatch.setattr(copilot_auth, "_read_macos_keychain_oauth_token", lambda: None)
     monkeypatch.setattr(copilot_auth, "_read_gh_cli_oauth_token", lambda: None)
 
-    assert copilot_auth.read_cached_oauth_token() == "gho-file"
+    assert copilot_auth.read_cached_oauth_token() == "fake-file-token"
 
 
 def test_read_cached_oauth_token_skips_expired_entries(
@@ -206,7 +220,7 @@ def test_read_cached_oauth_token_skips_expired_entries(
 ) -> None:
     hosts = tmp_path / "hosts.json"
     hosts.write_text(
-        json.dumps({"github.com": {"oauthToken": "gho-old", "expiresAt": 1}}),
+        json.dumps({"github.com": {"oauthToken": "fake-old-token", "expiresAt": 1}}),
         encoding="utf-8",
     )
     monkeypatch.setenv("GITHUB_COPILOT_TOKEN_FILE", str(hosts))
@@ -223,7 +237,7 @@ def test_read_gh_cli_oauth_token_uses_hostname(monkeypatch: pytest.MonkeyPatch) 
     class CompletedProcess:
         def __init__(self) -> None:
             self.returncode = 0
-            self.stdout = "gho-gh-cli\n"
+            self.stdout = "fake-gh-cli-token\n"
 
     def fake_run(*args: object, **kwargs: object) -> CompletedProcess:
         calls.append(list(args[0]))
@@ -234,7 +248,7 @@ def test_read_gh_cli_oauth_token_uses_hostname(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("GITHUB_COPILOT_HOST", "example.ghe.com")
     monkeypatch.setattr(copilot_auth.subprocess, "run", fake_run)
 
-    assert copilot_auth._read_gh_cli_oauth_token() == "gho-gh-cli"
+    assert copilot_auth._read_gh_cli_oauth_token() == "fake-gh-cli-token"
     assert calls == [["gh", "auth", "token", "--hostname", "example.ghe.com"]]
 
 
@@ -275,7 +289,7 @@ def test_read_gh_cli_oauth_token_returns_none_for_blank_stdout(
 
 def test_resolve_client_bearer_token_prefers_api_token(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GITHUB_COPILOT_API_TOKEN", "copilot-api")
-    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "gho-oauth")
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "fake-oauth-token")
 
     assert copilot_auth.resolve_client_bearer_token() == "copilot-api"
 
@@ -337,7 +351,7 @@ def test_apply_copilot_api_auth_replaces_authorization(monkeypatch: pytest.Monke
 def test_token_provider_reuses_oauth_token_without_exchange(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "gho-oauth")
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "fake-oauth-token")
 
     provider = copilot_auth.CopilotTokenProvider()
     calls = {"count": 0}
@@ -357,13 +371,13 @@ def test_token_provider_reuses_oauth_token_without_exchange(
     first = asyncio.run(provider.get_api_token())
     second = asyncio.run(provider.get_api_token())
 
-    assert first.token == "gho-oauth"
-    assert second.token == "gho-oauth"
+    assert first.token == "fake-oauth-token"
+    assert second.token == "fake-oauth-token"
     assert calls["count"] == 0
 
 
 def test_token_provider_can_exchange_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "gho-oauth")
+    monkeypatch.setenv("GITHUB_COPILOT_TOKEN", "fake-oauth-token")
     monkeypatch.setenv("GITHUB_COPILOT_USE_TOKEN_EXCHANGE", "true")
 
     provider = copilot_auth.CopilotTokenProvider()
@@ -418,7 +432,7 @@ def test_exchange_token_raises_when_exchange_returns_empty_token(
     )
 
     with pytest.raises(RuntimeError, match="empty token"):
-        asyncio.run(provider._exchange_token("gho-oauth"))
+        asyncio.run(provider._exchange_token("fake-oauth-token"))
 
 
 def test_exchange_token_sync_raises_for_http_error(monkeypatch: pytest.MonkeyPatch) -> None:

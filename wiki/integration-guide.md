@@ -208,7 +208,7 @@ headroom wrap copilot --backend anyllm --anyllm-provider groq -- --model gpt-4o
 
 By default, `headroom wrap copilot` installs `rtk` and appends token-optimized shell guidance to `.github/copilot-instructions.md` so Copilot sessions reuse the same command-saving conventions as other wrapped agent CLIs. Use `--no-rtk` to skip that step.
 
-For Copilot's **hosted** API (`--subscription` and the implicit OAuth path), Headroom routes to the generic host `https://api.githubcopilot.com`, which serves the full model set. **Enterprise / data-residency** tenants on a dedicated Copilot host pin it with `GITHUB_COPILOT_API_URL` (e.g. `export GITHUB_COPILOT_API_URL=https://api.<your-host>.githubcopilot.com`); the override flows through to the upstream request. See [`TESTING-copilot-subscription.md`](https://github.com/chopratejas/headroom/blob/main/TESTING-copilot-subscription.md).
+For Copilot's **hosted** API (`--subscription` and the implicit OAuth path), Headroom routes to the generic host `https://api.githubcopilot.com`, which serves the full model set. **Enterprise / data-residency** tenants on a dedicated Copilot host pin it with `GITHUB_COPILOT_API_URL` (e.g. `export GITHUB_COPILOT_API_URL=https://api.<your-host>.githubcopilot.com`); the override flows through to the upstream request. See [`TESTING-copilot-subscription.md`](https://github.com/teru-murata/headroom/blob/main/TESTING-copilot-subscription.md).
 
 ### With Cloud Providers
 
@@ -223,7 +223,7 @@ headroom proxy --backend vertex_ai --region us-central1
 headroom proxy --backend azure
 
 # OpenRouter (400+ models)
-OPENROUTER_API_KEY=sk-or-... headroom proxy --backend openrouter
+OPENROUTER_API_KEY=<openrouter-api-key> headroom proxy --backend openrouter
 ```
 
 See [Proxy Documentation](proxy.md) for all options.

@@ -2570,8 +2570,8 @@ def copilot(
                 f"  Copilot API and routes requests directly to the model provider through the\n"
                 f"  Headroom proxy. A GitHub Copilot subscription alone is not sufficient.\n\n"
                 f"  Set one of:\n"
-                f"    export {src}=sk-...          # recommended\n"
-                f"    export COPILOT_PROVIDER_API_KEY=sk-...  # also works\n"
+                f"    export {src}=<provider-api-key>          # recommended\n"
+                f"    export COPILOT_PROVIDER_API_KEY=<provider-api-key>  # also works\n"
             )
             raise SystemExit(1)
 

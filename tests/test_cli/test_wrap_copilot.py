@@ -71,7 +71,7 @@ def test_wrap_copilot_auto_anthropic_injects_instructions(
 ) -> None:
     wrap_cli, main = wrap_modules
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-provider-api-key")
     captured: dict[str, object] = {}
 
     def fake_launch_tool(**kwargs):  # noqa: ANN003
@@ -111,7 +111,7 @@ def test_wrap_copilot_openai_backend_sets_completions_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _wrap_cli, main = wrap_modules
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-provider-api-key")
     captured: dict[str, object] = {}
 
     def fake_launch_tool(**kwargs):  # noqa: ANN003
@@ -159,7 +159,7 @@ def test_wrap_copilot_auto_detects_running_proxy_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _wrap_cli, main = wrap_modules
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-provider-api-key")
     captured: dict[str, object] = {}
 
     def fake_launch_tool(**kwargs):  # noqa: ANN003
@@ -191,14 +191,17 @@ def test_wrap_copilot_prefers_existing_oauth_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _wrap_cli, main = wrap_modules
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-provider-api-key")
     captured: dict[str, object] = {}
 
     def fake_launch_tool(**kwargs):  # noqa: ANN003
         captured.update(kwargs)
 
     with patch("headroom.cli.wrap.shutil.which", return_value="copilot"):
-        with patch("headroom.cli.wrap.resolve_client_bearer_token", return_value="gho-existing"):
+        with patch(
+            "headroom.cli.wrap.resolve_client_bearer_token",
+            return_value="fake-existing-token",
+        ):
             with patch("headroom.cli.wrap.has_oauth_auth", return_value=True):
                 with patch("headroom.cli.wrap._launch_tool", side_effect=fake_launch_tool):
                     result = runner.invoke(
@@ -212,7 +215,7 @@ def test_wrap_copilot_prefers_existing_oauth_session(
     assert env["COPILOT_PROVIDER_TYPE"] == "openai"
     assert env["COPILOT_PROVIDER_BASE_URL"] == "http://127.0.0.1:8787/v1"
     assert env["COPILOT_PROVIDER_WIRE_API"] == "completions"
-    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "gho-existing"
+    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "fake-existing-token"
     assert env["GITHUB_COPILOT_API_URL"] == DEFAULT_API_URL
     assert env["OPENAI_TARGET_API_URL"] == DEFAULT_API_URL
     assert "COPILOT_PROVIDER_API_KEY" not in env
@@ -235,7 +238,10 @@ def test_wrap_copilot_subscription_uses_github_auth_without_provider_key(
 
     with (
         patch("headroom.cli.wrap.shutil.which", return_value="copilot"),
-        patch("headroom.cli.wrap.resolve_subscription_bearer_token", return_value="gho-existing"),
+        patch(
+            "headroom.cli.wrap.resolve_subscription_bearer_token",
+            return_value="fake-existing-token",
+        ),
         patch("headroom.cli.wrap.has_oauth_auth", return_value=False),
         patch("headroom.cli.wrap._launch_tool", side_effect=fake_launch_tool),
     ):
@@ -251,7 +257,7 @@ def test_wrap_copilot_subscription_uses_github_auth_without_provider_key(
     assert env["COPILOT_PROVIDER_TYPE"] == "openai"
     assert env["COPILOT_PROVIDER_BASE_URL"] == "http://127.0.0.1:8787/v1"
     assert env["COPILOT_PROVIDER_WIRE_API"] == "completions"
-    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "gho-existing"
+    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "fake-existing-token"
     assert "COPILOT_PROVIDER_API_KEY" not in env
     assert captured["openai_api_url"] == DEFAULT_API_URL
 
@@ -283,7 +289,7 @@ def test_wrap_copilot_subscription_pins_validated_token_for_proxy(
         patch("headroom.cli.wrap.shutil.which", return_value="copilot"),
         patch(
             "headroom.cli.wrap.resolve_subscription_bearer_token",
-            return_value="gho-validated",
+            return_value="fake-validated-token",
         ),
         patch("headroom.cli.wrap.resolve_copilot_api_url", return_value=business_api),
         patch("headroom.cli.wrap.has_oauth_auth", return_value=False),
@@ -296,17 +302,17 @@ def test_wrap_copilot_subscription_pins_validated_token_for_proxy(
     assert isinstance(env, dict)
     # The validated token is handed to the proxy as an explicit launch
     # argument — not via the child env, not via the parent's os.environ.
-    assert captured["copilot_api_token"] == "gho-validated"
+    assert captured["copilot_api_token"] == "fake-validated-token"
     assert "GITHUB_COPILOT_API_TOKEN" not in env
     assert os.environ.get("GITHUB_COPILOT_API_TOKEN") is None
     assert env["COPILOT_PROVIDER_TYPE"] == "openai"
-    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "gho-validated"
+    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "fake-validated-token"
     assert env["GITHUB_COPILOT_USE_TOKEN_EXCHANGE"] == "false"
     assert env["OPENAI_TARGET_API_URL"] == business_api
     assert captured["openai_api_url"] == business_api
     assert "COPILOT_PROVIDER_API_KEY" not in env
     # The secret must never be echoed to the terminal.
-    assert "gho-validated" not in result.output
+    assert "fake-validated-token" not in result.output
 
 
 def test_wrap_copilot_subscription_requires_reusable_auth(
@@ -448,7 +454,7 @@ def test_wrap_copilot_clears_stale_wire_api_in_anthropic_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _wrap_cli, main = wrap_modules
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-provider-api-key")
     captured: dict[str, object] = {}
 
     def fake_launch_tool(**kwargs):  # noqa: ANN003
@@ -464,7 +470,7 @@ def test_wrap_copilot_clears_stale_wire_api_in_anthropic_mode(
             ["wrap", "copilot", "--no-rtk", "--", "--model", "claude-sonnet-4-20250514"],
             env={
                 "COPILOT_PROVIDER_WIRE_API": "responses",
-                "ANTHROPIC_API_KEY": "sk-test-dummy",
+                "ANTHROPIC_API_KEY": "test-provider-api-key",
             },
         )
 
@@ -538,7 +544,7 @@ def test_wrap_copilot_oauth_keeps_generic_endpoint_when_account_advertised(
 
     with (
         patch("headroom.cli.wrap.shutil.which", return_value="copilot"),
-        patch("headroom.cli.wrap.resolve_client_bearer_token", return_value="gho-oauth"),
+        patch("headroom.cli.wrap.resolve_client_bearer_token", return_value="fake-oauth-token"),
         patch("headroom.cli.wrap.has_oauth_auth", return_value=True),
         patch("headroom.copilot_auth._fetch_copilot_user_info", return_value=_ACCOUNT_USER_INFO),
         patch("headroom.cli.wrap._launch_tool", side_effect=fake_launch_tool),
@@ -548,7 +554,7 @@ def test_wrap_copilot_oauth_keeps_generic_endpoint_when_account_advertised(
     assert result.exit_code == 0, result.output
     env = captured["env"]
     assert isinstance(env, dict)
-    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "gho-oauth"
+    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "fake-oauth-token"
     assert captured["openai_api_url"] == DEFAULT_API_URL
     assert env["OPENAI_TARGET_API_URL"] == DEFAULT_API_URL
     assert env["GITHUB_COPILOT_API_URL"] == DEFAULT_API_URL
@@ -571,7 +577,7 @@ def test_wrap_copilot_oauth_honors_api_url_override(
 
     with (
         patch("headroom.cli.wrap.shutil.which", return_value="copilot"),
-        patch("headroom.cli.wrap.resolve_client_bearer_token", return_value="gho-oauth"),
+        patch("headroom.cli.wrap.resolve_client_bearer_token", return_value="fake-oauth-token"),
         patch("headroom.cli.wrap.has_oauth_auth", return_value=True),
         patch("headroom.copilot_auth._fetch_copilot_user_info", return_value=_ACCOUNT_USER_INFO),
         patch("headroom.cli.wrap._launch_tool", side_effect=fake_launch_tool),
@@ -596,7 +602,7 @@ def test_wrap_copilot_byok_never_resolves_copilot_endpoint(
     """
     _wrap_cli, main = wrap_modules
     _clear_copilot_env(monkeypatch)
-    monkeypatch.setenv("COPILOT_PROVIDER_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("COPILOT_PROVIDER_API_KEY", "test-provider-api-key")
     captured: dict[str, object] = {}
 
     def fake_launch_tool(**kwargs):  # noqa: ANN003
@@ -641,7 +647,10 @@ def test_wrap_copilot_subscription_uses_generic_endpoint_not_account(
 
     with (
         patch("headroom.cli.wrap.shutil.which", return_value="copilot"),
-        patch("headroom.cli.wrap.resolve_subscription_bearer_token", return_value="gho-sub"),
+        patch(
+            "headroom.cli.wrap.resolve_subscription_bearer_token",
+            return_value="fake-subscription-token",
+        ),
         patch("headroom.cli.wrap.has_oauth_auth", return_value=True),
         patch("headroom.copilot_auth._fetch_copilot_user_info", return_value=_ACCOUNT_USER_INFO),
         patch("headroom.cli.wrap._launch_tool", side_effect=fake_launch_tool),
@@ -656,7 +665,7 @@ def test_wrap_copilot_subscription_uses_generic_endpoint_not_account(
     assert isinstance(env, dict)
     assert captured["openai_api_url"] == DEFAULT_API_URL
     assert env["OPENAI_TARGET_API_URL"] == DEFAULT_API_URL
-    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "gho-sub"
+    assert env["COPILOT_PROVIDER_BEARER_TOKEN"] == "fake-subscription-token"
 
 
 def test_wrap_copilot_subscription_honors_api_url_override(
@@ -676,7 +685,10 @@ def test_wrap_copilot_subscription_honors_api_url_override(
 
     with (
         patch("headroom.cli.wrap.shutil.which", return_value="copilot"),
-        patch("headroom.cli.wrap.resolve_subscription_bearer_token", return_value="gho-sub"),
+        patch(
+            "headroom.cli.wrap.resolve_subscription_bearer_token",
+            return_value="fake-subscription-token",
+        ),
         patch("headroom.cli.wrap.has_oauth_auth", return_value=True),
         patch("headroom.cli.wrap._launch_tool", side_effect=fake_launch_tool),
     ):
@@ -699,10 +711,12 @@ def test_resolve_copilot_api_url_ignores_user_info_and_never_calls_network(
 
     monkeypatch.delenv("GITHUB_COPILOT_API_URL", raising=False)
     with patch.object(copilot_auth, "_fetch_copilot_user_info") as fetch:
-        assert copilot_auth.resolve_copilot_api_url("gho-real") == copilot_auth.DEFAULT_API_URL
+        assert (
+            copilot_auth.resolve_copilot_api_url("fake-real-token") == copilot_auth.DEFAULT_API_URL
+        )
     fetch.assert_not_called()
 
     monkeypatch.setenv("GITHUB_COPILOT_API_URL", "https://pin.example.com")
     with patch.object(copilot_auth, "_fetch_copilot_user_info") as fetch:
-        assert copilot_auth.resolve_copilot_api_url("gho-real") == "https://pin.example.com"
+        assert copilot_auth.resolve_copilot_api_url("fake-real-token") == "https://pin.example.com"
     fetch.assert_not_called()
