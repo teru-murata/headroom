@@ -76,6 +76,12 @@ class PrometheusMetrics:
         self.requests_cached = 0
         self.requests_rate_limited = 0
         self.requests_failed = 0
+        # Fail-open compression degradations: the compression pipeline
+        # raised and the handler forwarded the ORIGINAL (uncompressed)
+        # messages. A fleet-wide compression outage must be visible on the
+        # metrics lane, not only via the per-request
+        # x-headroom-compression-failed response header.
+        self.compression_failed = 0
         self.inbound_requests_total = 0
         self.inbound_requests_completed = 0
         self.inbound_requests_active = 0
@@ -257,6 +263,7 @@ class PrometheusMetrics:
             self.requests_cached = 0
             self.requests_rate_limited = 0
             self.requests_failed = 0
+            self.compression_failed = 0
             self.inbound_requests_total = 0
             self.inbound_requests_completed = 0
             self.inbound_requests_active = 0
@@ -766,6 +773,12 @@ class PrometheusMetrics:
             self.requests_failed += 1
         self._get_otel_metrics().record_proxy_failed(provider=provider, model=model)
 
+    async def record_compression_failed(self):
+        """Record a fail-open compression degradation (pipeline raised; the
+        original uncompressed messages were forwarded)."""
+        async with self._lock:
+            self.compression_failed += 1
+
     async def export(self) -> str:
         """Export metrics in Prometheus format."""
         # Snapshot stage-timing dicts under the tiny synchronous lock so
@@ -806,6 +819,13 @@ class PrometheusMetrics:
                 metric_type="counter",
                 help_text="Failed requests",
                 value=self.requests_failed,
+            )
+            _append_metric(
+                lines,
+                name="headroom_compression_failed_total",
+                metric_type="counter",
+                help_text="Fail-open compression degradations (pipeline raised; original messages forwarded)",
+                value=self.compression_failed,
             )
             _append_metric(
                 lines,

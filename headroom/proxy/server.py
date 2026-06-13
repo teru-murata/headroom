@@ -1697,10 +1697,19 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         return payload
 
     # CORS
+    #
+    # Wildcard origins MUST NOT be paired with allow_credentials=True: Starlette
+    # resolves that antipattern by *reflecting* the request Origin alongside
+    # Access-Control-Allow-Credentials: true, letting any website issue
+    # credentialed cross-origin reads against the proxy. The proxy authenticates
+    # via forwarded provider API keys / loopback guards, not ambient browser
+    # credentials (cookies), so credentialed CORS is not needed. Keep the
+    # permissive wildcard for tooling/dashboards but drop credentials so no
+    # arbitrary origin is reflected with allow-credentials.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -2650,7 +2659,7 @@ def create_app(config: ProxyConfig | None = None) -> FastAPI:
         telemetry = get_telemetry_collector()
         return telemetry.export_stats()
 
-    @app.post("/v1/telemetry/import")
+    @app.post("/v1/telemetry/import", dependencies=[Depends(_require_loopback)])
     async def telemetry_import(request: Request):
         """Import telemetry data from another source.
 
