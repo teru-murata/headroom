@@ -40,13 +40,20 @@ fn main() -> Result<()> {
         }
         Cmd::Run { fixtures, only } => {
             let mut any_diffs = false;
+            let mut any_skipped = false;
+            // Track total fixtures compared across all run comparators so a
+            // missing/empty/typo'd fixtures dir (total==0) cannot pass green.
+            let mut grand_total = 0usize;
+            let mut ran_any_comparator = false;
             for comparator in builtin_comparators() {
                 if let Some(ref filt) = only {
                     if filt != comparator.name() {
                         continue;
                     }
                 }
+                ran_any_comparator = true;
                 let report = run_comparator(&fixtures, comparator.as_ref())?;
+                grand_total += report.total();
                 println!(
                     "[{:<16}] total={} matched={} skipped={} diffed={}",
                     comparator.name(),
@@ -56,6 +63,7 @@ fn main() -> Result<()> {
                     report.diffed.len()
                 );
                 for (path, reason) in &report.skipped {
+                    any_skipped = true;
                     println!("  skipped {}: {}", path.display(), reason);
                 }
                 for (path, expected, actual) in &report.diffed {
@@ -65,7 +73,31 @@ fn main() -> Result<()> {
                     println!("    actual  : {}", first_line(actual));
                 }
             }
+            // Fail-closed parity gate: an explicit diff, any skipped fixture
+            // (comparator bailed/panicked -> proves nothing), zero fixtures
+            // compared (missing/empty/typo'd fixtures dir), or an --only filter
+            // that matched no comparator must all exit non-zero. A green exit
+            // requires we actually compared >=1 fixture and every one matched.
             if any_diffs {
+                eprintln!("parity FAILED: at least one fixture diffed");
+                std::process::exit(1);
+            }
+            if any_skipped {
+                eprintln!(
+                    "parity FAILED: at least one fixture was SKIPPED (comparator error); \
+                     a skipped fixture proves nothing, so the gate is fail-closed"
+                );
+                std::process::exit(1);
+            }
+            if !ran_any_comparator {
+                eprintln!("parity FAILED: --only filter matched no known comparator");
+                std::process::exit(1);
+            }
+            if grand_total == 0 {
+                eprintln!(
+                    "parity FAILED: compared ZERO fixtures (missing/empty/typo'd fixtures dir); \
+                     refusing to pass vacuously"
+                );
                 std::process::exit(1);
             }
             Ok(())
