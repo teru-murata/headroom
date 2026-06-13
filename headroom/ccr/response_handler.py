@@ -13,6 +13,7 @@ can't handle the LLM's tool calls.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -438,8 +439,14 @@ class CCRResponseHandler:
 
             logger.info(f"CCR: Handling {len(ccr_calls)} retrieval(s) in round {rounds}")
 
-            # Execute all CCR retrievals
-            results = [self._execute_retrieval(call) for call in ccr_calls]
+            # Execute all CCR retrievals.
+            # store.retrieve()/store.search() do blocking SQLite disk I/O,
+            # BM25 scoring and json parsing under a threading.Lock; offload to
+            # worker threads so a slow/contended retrieval cannot starve the
+            # event loop and every other in-flight proxy request.
+            results = await asyncio.gather(
+                *(asyncio.to_thread(self._execute_retrieval, call) for call in ccr_calls)
+            )
 
             # Log retrieval stats
             total_items = sum(r.items_retrieved for r in results)
@@ -463,9 +470,25 @@ class CCRResponseHandler:
             else:
                 current_messages.append(tool_result_msg)
 
-            # Make continuation API call
+            # Make continuation API call, bounded by continuation_timeout_ms so
+            # a hung upstream cannot block the CCR continuation indefinitely.
             try:
-                current_response = await api_call_fn(current_messages, tools)
+                timeout_ms = self.config.continuation_timeout_ms
+                if timeout_ms and timeout_ms > 0:
+                    current_response = await asyncio.wait_for(
+                        api_call_fn(current_messages, tools),
+                        timeout=timeout_ms / 1000.0,
+                    )
+                else:
+                    current_response = await api_call_fn(current_messages, tools)
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"CCR: Continuation API call timed out after "
+                    f"{self.config.continuation_timeout_ms}ms"
+                )
+                # Return the last response we had (with unhandled CCR calls);
+                # the client sees the tool_use and may handle it differently.
+                break
             except Exception as e:
                 logger.error(f"CCR: Continuation API call failed: {e}")
                 # Return the response we had (with unhandled CCR calls)

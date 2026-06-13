@@ -421,6 +421,24 @@ class CompressionStore:
 
         return result_entry
 
+    @staticmethod
+    def _recount_tokens(text: str) -> int:
+        """Honest, dependency-free token estimate for ledger provenance.
+
+        The producer-supplied ``original_tokens``/``compressed_tokens`` on the
+        entry are self-reported at ``store()`` time and never verified, so they
+        cannot be trusted as *measured* CCR savings. For the ledger we recount
+        the actual stored content here: max of whitespace word count and a
+        chars/4 heuristic. This is monotonic in content size, so a "compressed"
+        payload that is in fact larger than the original can never report a
+        positive saving.
+        """
+        if not text:
+            return 0
+        words = len(text.split())
+        chars = len(text)
+        return max(words, (chars + 3) // 4)
+
     def _emit_ledger_retrieved_event(
         self,
         hash_key: str,
@@ -430,16 +448,21 @@ class CompressionStore:
         try:
             from ..telemetry.ledger import LedgerEvent, get_ledger_emitter
 
+            # Recount the REAL stored content instead of trusting the
+            # producer-supplied token counts, so the ledger reflects measured
+            # savings rather than whatever the producer asserted at store() time.
+            measured_original = self._recount_tokens(entry.original_content)
+            measured_compressed = self._recount_tokens(entry.compressed_content)
+            measured_saved = max(measured_original - measured_compressed, 0)
+
             get_ledger_emitter().emit(
                 LedgerEvent.create(
                     "bridge.ccr.retrieved",
                     source_id=entry.tool_signature_hash,
                     source_type=entry.compression_strategy,
-                    original_tokens=entry.original_tokens or None,
-                    compressed_tokens=entry.compressed_tokens or None,
-                    saved_tokens=max(entry.original_tokens - entry.compressed_tokens, 0)
-                    if entry.original_tokens and entry.compressed_tokens
-                    else None,
+                    original_tokens=measured_original or None,
+                    compressed_tokens=measured_compressed or None,
+                    saved_tokens=measured_saved,
                     compression_method=entry.compression_strategy,
                     ccr_marker_id=hash_key,
                     ccr_backend=type(self._backend).__name__,
