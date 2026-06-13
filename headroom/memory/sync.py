@@ -138,13 +138,20 @@ def _save_sync_state(state_path: Path, state: dict[str, Any]) -> None:
 
 
 def _db_fingerprint(memories: list[Any]) -> str:
-    """Compute a fast fingerprint of DB state."""
+    """Compute a fingerprint of DB state.
+
+    Folds id + content + updated_at of every memory so that a DB-side
+    content edit (same id, same count) changes the fingerprint. Sampling
+    only ids/count would let the no-op gate silently skip exporting edited
+    content while logging "nothing changed".
+    """
     if not memories:
         return "empty"
-    # Hash: count + most recent created_at
     parts = [str(len(memories))]
-    for m in memories[:5]:  # Sample first 5 for speed
-        parts.append(getattr(m, "id", "")[:8])
+    for m in memories:
+        parts.append(str(getattr(m, "id", "") or ""))
+        parts.append(str(getattr(m, "content", "") or ""))
+        parts.append(str(getattr(m, "updated_at", "") or ""))
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
 
 

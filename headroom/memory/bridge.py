@@ -345,8 +345,16 @@ class MemoryBridge:
                 min_similarity=threshold,
             )
             return len(results) > 0
-        except Exception:
-            # If search fails, don't block import
+        except Exception as e:
+            # Fail-open: a search/embedder outage must not block import, but
+            # the degradation must be VISIBLE to operators. A silent fail-open
+            # treats every section as non-duplicate and floods the store with
+            # duplicates on re-import. Name the fail-open at the boundary.
+            logger.warning(
+                "Bridge: dedup search failed (%s); treating section as "
+                "non-duplicate (fail-open) — import may create duplicates",
+                e,
+            )
             return False
 
     # =========================================================================
