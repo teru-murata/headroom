@@ -599,11 +599,17 @@ class LogCompressor:
         delegates to `_persist_to_python_ccr`. Returns the stored
         cache_key if persistence succeeded, else None.
         """
-        # Compute the same cache key the Rust path would (MD5 of
-        # original truncated to 24 hex chars).
+        # Key content the same way ``CompressionStore`` does by default:
+        # SHA-256 of the original truncated to 24 hex chars. The store moved
+        # OFF MD5 in PR #395 (CodeQL weak-hash); keeping MD5[:24] here meant
+        # this shim emitted a key that disagreed with the store's own key
+        # for the same content (and used a collision-attackable digest on
+        # attacker-influenced tool output). Aligning to SHA-256[:24] keeps
+        # the shim, the store default, and the live compress() path
+        # consistent (F20).
         import hashlib
 
-        cache_key = hashlib.md5(original.encode()).hexdigest()[:24]
+        cache_key = hashlib.sha256(original.encode()).hexdigest()[:24]
         try:
             from ..cache.compression_store import get_compression_store
         except ImportError as e:
