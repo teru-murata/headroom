@@ -54,6 +54,31 @@ from .content_detector import detect_content_type as _regex_detect_content_type
 logger = logging.getLogger(__name__)
 
 
+# Subword-token segmentation: word/number runs plus each individual
+# punctuation mark. This is a faithful lower bound on real BPE token
+# counts (BPE never merges across the word/punctuation boundary for the
+# structural, punctuation-dense content the router sees most -- JSON,
+# logs, diffs), and unlike ``len(text.split())`` it is a genuine *token*
+# count rather than a whitespace *word* count. The per-strategy metrics
+# that flow to the CompressionObserver/Prometheus surface must be token
+# counts, not word counts, so they stay comparable with the tokenizer
+# counts ``apply()`` records for tokens_before/after.
+_TOKEN_SEGMENT_PATTERN = re.compile(r"\w+|[^\w\s]")
+
+
+def _estimate_tokens(text: str) -> int:
+    """Estimate the token count of ``text``.
+
+    Returns a genuine subword-token count (word/number runs + individual
+    punctuation marks), NOT the whitespace word count. For whitespace-
+    sparse, punctuation-dense content (compact JSON, logs) this is many
+    times ``len(text.split())`` and tracks real tokenizers far better.
+    """
+    if not text:
+        return 0
+    return len(_TOKEN_SEGMENT_PATTERN.findall(text))
+
+
 def _router_debug_dumps(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))
 
@@ -212,10 +237,18 @@ class CompressionCache:
     """
 
     def __init__(self, ttl_seconds: int = 1800):
-        # Tier 2: compressed results {hash: (text, ratio, strategy, timestamp)}
-        self._results: dict[int, tuple[str, float, str, float]] = {}
-        # Tier 1: hashes of content that won't compress {hash: timestamp}
-        self._skip: dict[int, float] = {}
+        # Tier 2: compressed results
+        #   {key: (originating_content, text, ratio, strategy, timestamp)}
+        # The originating content is stored so reads can re-verify content
+        # equality: ``key`` is only a fast bucket (Python ``hash`` is a
+        # 64-bit value and DOES collide adversarially — tool outputs are
+        # attacker-influenced), so a bare key match is NOT proof the cached
+        # bytes belong to the caller's content. Without this recheck a hash
+        # collision silently substitutes a different message's compressed
+        # bytes into the prompt (F18).
+        self._results: dict[int, tuple[str, str, float, str, float]] = {}
+        # Tier 1: content that won't compress {key: (originating_content, ts)}
+        self._skip: dict[int, tuple[str, float]] = {}
         self._ttl_seconds = ttl_seconds
         # Metrics
         self._hits = 0
@@ -225,53 +258,64 @@ class CompressionCache:
         self._total_lookup_ns = 0
         self._lookup_count = 0
 
-    def get(self, key: int) -> tuple[str, float, str] | None:
-        """Get cached compression result.
+    def get(self, key: int, content: str) -> tuple[str, float, str] | None:
+        """Get cached compression result for ``content``.
 
-        Returns (compressed_text, ratio, strategy) or None if not found/expired.
-        Use is_skipped() first to check if content is known non-compressible.
+        ``key`` is a fast bucket; ``content`` is the originating text the
+        caller holds. The stored originating content is compared for
+        equality before returning — on a key collision (different content,
+        same bucket) this returns None (a miss) instead of another
+        message's compressed bytes. Returns (compressed_text, ratio,
+        strategy) or None if not found/expired/mismatched.
         """
         t0 = time.perf_counter_ns()
         entry = self._results.get(key)
         if entry is not None:
-            compressed, ratio, strategy, created_at = entry
-            if (time.time() - created_at) < self._ttl_seconds:
+            stored_content, compressed, ratio, strategy, created_at = entry
+            if (time.time() - created_at) >= self._ttl_seconds:
+                del self._results[key]
+                self._evictions += 1
+            elif stored_content == content:
                 self._hits += 1
                 self._total_lookup_ns += time.perf_counter_ns() - t0
                 self._lookup_count += 1
                 return (compressed, ratio, strategy)
-            else:
-                del self._results[key]
-                self._evictions += 1
+            # else: key collision with different content -> treat as miss,
+            # do NOT evict the legitimate occupant.
         self._misses += 1
         self._total_lookup_ns += time.perf_counter_ns() - t0
         self._lookup_count += 1
         return None
 
-    def is_skipped(self, key: int) -> bool:
-        """Check if content is known non-compressible (Tier 1)."""
-        ts = self._skip.get(key)
-        if ts is not None:
-            if (time.time() - ts) < self._ttl_seconds:
-                self._skip_hits += 1
-                return True
-            else:
+    def is_skipped(self, key: int, content: str) -> bool:
+        """Check if ``content`` is known non-compressible (Tier 1).
+
+        Verifies the stored originating content matches before treating it
+        as a skip hit, so a colliding key for different content is a miss.
+        """
+        entry = self._skip.get(key)
+        if entry is not None:
+            stored_content, ts = entry
+            if (time.time() - ts) >= self._ttl_seconds:
                 del self._skip[key]
                 self._evictions += 1
+            elif stored_content == content:
+                self._skip_hits += 1
+                return True
         return False
 
-    def put(self, key: int, compressed: str, ratio: float, strategy: str) -> None:
-        """Store a compressed result (Tier 2)."""
-        self._results[key] = (compressed, ratio, strategy, time.time())
+    def put(self, key: int, content: str, compressed: str, ratio: float, strategy: str) -> None:
+        """Store a compressed result (Tier 2), keyed with its originating content."""
+        self._results[key] = (content, compressed, ratio, strategy, time.time())
 
-    def mark_skip(self, key: int) -> None:
-        """Mark content as non-compressible (Tier 1)."""
-        self._skip[key] = time.time()
+    def mark_skip(self, key: int, content: str) -> None:
+        """Mark ``content`` as non-compressible (Tier 1)."""
+        self._skip[key] = (content, time.time())
 
-    def move_to_skip(self, key: int) -> None:
+    def move_to_skip(self, key: int, content: str) -> None:
         """Move a result to skip set (threshold tightened, no longer qualifies)."""
         self._results.pop(key, None)
-        self._skip[key] = time.time()
+        self._skip[key] = (content, time.time())
 
     @property
     def size(self) -> int:
@@ -300,6 +344,14 @@ class CompressionCache:
         self._skip.clear()
 
 
+# Strategy-chain token appended when a compressor raised and we fell
+# back to passthrough. It makes a *crashing* compressor distinguishable
+# from a *legitimately* non-compressible no-op (whose chain has no such
+# token), so the observer/metrics surface gets a real failure signal
+# instead of a passthrough that looks identical to a benign input (F19).
+_STRATEGY_ERROR_MARKER = "error"
+
+
 class CompressionStrategy(Enum):
     """Available compression strategies."""
 
@@ -326,6 +378,10 @@ class RoutingDecision:
     compressed_tokens: int
     confidence: float = 1.0
     section_index: int = 0
+    # True when the chosen compressor raised and we fell back to
+    # passthrough. Distinguishes a crash from a benign no-op so operator
+    # metrics can surface a failure signal (F19).
+    error: bool = False
 
     @property
     def compression_ratio(self) -> float:
@@ -998,9 +1054,17 @@ class ContentRouter(Transform):
         if self._observer is None:
             return
         for d in result.routing_log:
+            # Surface compressor failures as a distinct strategy tag so a
+            # crash is not indistinguishable from a benign passthrough in
+            # per-strategy metrics (F19).
+            strategy_label = (
+                f"{d.strategy.value}:{_STRATEGY_ERROR_MARKER}"
+                if d.error
+                else d.strategy.value
+            )
             try:
                 self._observer.record_compression(
-                    strategy=d.strategy.value,
+                    strategy=strategy_label,
                     original_tokens=d.original_tokens,
                     compressed_tokens=d.compressed_tokens,
                 )
@@ -1097,7 +1161,7 @@ class ContentRouter(Transform):
             strategy = self._strategy_from_detection_type(section.content_type)
 
             # Compress section
-            original_tokens = len(section.content.split())
+            original_tokens = _estimate_tokens(section.content)
             compressed_content, compressed_tokens, _section_chain = self._apply_strategy_to_content(
                 section.content,
                 strategy,
@@ -1118,6 +1182,7 @@ class ContentRouter(Transform):
                     strategy=strategy,
                     original_tokens=original_tokens,
                     compressed_tokens=compressed_tokens,
+                    error=_STRATEGY_ERROR_MARKER in _section_chain,
                     section_index=i,
                 )
             )
@@ -1150,7 +1215,7 @@ class ContentRouter(Transform):
         Returns:
             RouterCompressionResult.
         """
-        original_tokens = len(content.split())
+        original_tokens = _estimate_tokens(content)
 
         compressed, compressed_tokens, strategy_chain = self._apply_strategy_to_content(
             content, strategy, context, question=question, bias=bias
@@ -1167,6 +1232,7 @@ class ContentRouter(Transform):
                     strategy=strategy,
                     original_tokens=original_tokens,
                     compressed_tokens=compressed_tokens,
+                    error=_STRATEGY_ERROR_MARKER in strategy_chain,
                 )
             ],
         )
@@ -1200,7 +1266,7 @@ class ContentRouter(Transform):
             final compressor without parsing decision_reason strings.
         """
         # Track original tokens for TOIN recording
-        original_tokens = len(content.split())
+        original_tokens = _estimate_tokens(content)
         compressed: str | None = None
         compressed_tokens: int | None = None
         requested_strategy = strategy
@@ -1239,7 +1305,7 @@ class ContentRouter(Transform):
                         result = crusher.crush(content, query=context, bias=bias)
                         compressed, compressed_tokens = (
                             result.compressed,
-                            len(result.compressed.split()),
+                            _estimate_tokens(result.compressed),
                         )
                         smart_crusher_fallback = False
                         if result.compressed == content:
@@ -1265,7 +1331,7 @@ class ContentRouter(Transform):
                         result = compressor.compress(content, context=context, bias=bias)
                         compressed, compressed_tokens = (
                             result.compressed,
-                            len(result.compressed.split()),
+                            _estimate_tokens(result.compressed),
                         )
                         decision_reason = "search_compressor"
 
@@ -1281,7 +1347,7 @@ class ContentRouter(Transform):
                         # ratios meaningless against `original_tokens`.
                         compressed, compressed_tokens = (
                             result.compressed,
-                            len(result.compressed.split()),
+                            _estimate_tokens(result.compressed),
                         )
                         decision_reason = "log_compressor"
 
@@ -1292,7 +1358,7 @@ class ContentRouter(Transform):
                     result = compressor.compress(content, context=context)
                     compressed, compressed_tokens = (
                         result.compressed,
-                        len(result.compressed.split()),
+                        _estimate_tokens(result.compressed),
                     )
                     decision_reason = "diff_compressor"
 
@@ -1304,7 +1370,7 @@ class ContentRouter(Transform):
                         result = compressor.compress(content, context=context)
                         compressed, compressed_tokens = (
                             result.compressed,
-                            len(result.compressed.split()),
+                            _estimate_tokens(result.compressed),
                         )
                         decision_reason = "file_tree_compressor"
 
@@ -1316,7 +1382,7 @@ class ContentRouter(Transform):
                         result = extractor.extract(content)
                         compressed = result.extracted
                         # Estimate tokens from extracted text (simple word count)
-                        compressed_tokens = len(compressed.split()) if compressed else 0
+                        compressed_tokens = _estimate_tokens(compressed) if compressed else 0
                         decision_reason = "html_extractor"
 
             elif strategy == CompressionStrategy.KOMPRESS:
@@ -1341,6 +1407,9 @@ class ContentRouter(Transform):
             error = f"{type(e).__name__}: {e}"
             decision_reason = "compression_exception"
             logger.warning("Compression with %s failed: %s", strategy.value, e)
+            # Tag the chain so the passthrough fall-through below is
+            # distinguishable from a legitimate non-compressible no-op.
+            strategy_chain.append(_STRATEGY_ERROR_MARKER)
 
         # If compression succeeded, record to TOIN
         if compressed is not None and compressed_tokens is not None:
@@ -1378,7 +1447,7 @@ class ContentRouter(Transform):
                             except Exception as exc:  # noqa: BLE001
                                 logger.debug("Log fallback failed for SMART_CRUSHER: %s", exc)
                             else:
-                                log_compressed_tokens = len(log_result.compressed.split())
+                                log_compressed_tokens = _estimate_tokens(log_result.compressed)
                                 if log_compressed_tokens < compressed_tokens:
                                     compressed = log_result.compressed
                                     compressed_tokens = log_compressed_tokens
@@ -1478,7 +1547,7 @@ class ContentRouter(Transform):
 
         # If the entire content is custom tags with nothing to compress
         if protected and not cleaned.strip():
-            return content, len(content.split())
+            return content, _estimate_tokens(content)
 
         # Use the cleaned (tag-free) text for compression
         text_to_compress = cleaned if protected else content
@@ -1502,14 +1571,14 @@ class ContentRouter(Transform):
                     logger.warning("Kompress failed: %s", e)
 
         if compressed is None:
-            return content, len(content.split())
+            return content, _estimate_tokens(content)
 
         # Restore protected tag blocks into the compressed text
         if protected:
             compressed = restore_tags(compressed, protected)
-            compressed_tokens = len(compressed.split())
+            compressed_tokens = _estimate_tokens(compressed)
 
-        return compressed, compressed_tokens or len(compressed.split())
+        return compressed, compressed_tokens or _estimate_tokens(compressed)
 
     def _strategy_from_detection_type(self, content_type: ContentType) -> CompressionStrategy:
         """Get strategy from ContentType enum."""
@@ -2153,7 +2222,7 @@ class ContentRouter(Transform):
             content_key = hash(content)
 
             # Tier 1: skip set — instant rejection
-            if self._cache.is_skipped(content_key):
+            if self._cache.is_skipped(content_key, content):
                 result_slots[i] = message
                 route_counts["ratio_too_high"] += 1
                 route_counts.setdefault("cache_hit", 0)
@@ -2161,7 +2230,7 @@ class ContentRouter(Transform):
                 continue
 
             # Tier 2: result cache — reuse compressed output
-            cached = self._cache.get(content_key)
+            cached = self._cache.get(content_key, content)
             if cached is not None:
                 cached_compressed, cached_ratio, cached_strategy = cached
                 # Re-check ratio against current min_ratio (shifts with context pressure)
@@ -2171,7 +2240,7 @@ class ContentRouter(Transform):
                     compressed_details.append(f"{cached_strategy}:{cached_ratio:.2f}")
                 else:
                     # Threshold tightened — no longer qualifies. Move to skip.
-                    self._cache.move_to_skip(content_key)
+                    self._cache.move_to_skip(content_key, content)
                     result_slots[i] = message
                     route_counts["ratio_too_high"] += 1
                 route_counts.setdefault("cache_hit", 0)
@@ -2211,7 +2280,7 @@ class ContentRouter(Transform):
             compressor_timing["parallel_compress_total"] = parallel_ms
 
             # --- Pass 3: Merge results back (sequential, updates caches) ---
-            for (slot_idx, _, _, _, content_key), (result, compress_ms) in zip(
+            for (slot_idx, merge_content, _, _, content_key), (result, compress_ms) in zip(
                 pending_tasks, task_results
             ):
                 message = messages[slot_idx]
@@ -2224,6 +2293,7 @@ class ContentRouter(Transform):
                     # Compressed — store in result cache
                     self._cache.put(
                         content_key,
+                        merge_content,
                         result.compressed,
                         result.compression_ratio,
                         result.strategy_used.value,
@@ -2237,7 +2307,7 @@ class ContentRouter(Transform):
                     )
                 else:
                     # Didn't compress — add to skip set
-                    self._cache.mark_skip(content_key)
+                    self._cache.mark_skip(content_key, merge_content)
                     result_slots[slot_idx] = message
                     route_counts["ratio_too_high"] += 1
 
@@ -2464,7 +2534,7 @@ class ContentRouter(Transform):
                     content_key = hash(tool_content)
 
                     # Tier 1: skip set — instant rejection
-                    if self._cache.is_skipped(content_key):
+                    if self._cache.is_skipped(content_key, tool_content):
                         new_blocks.append(block)
                         if route_counts is not None:
                             route_counts["ratio_too_high"] += 1
@@ -2473,7 +2543,7 @@ class ContentRouter(Transform):
                         continue
 
                     # Tier 2: result cache — reuse compressed output
-                    cached = self._cache.get(content_key)
+                    cached = self._cache.get(content_key, tool_content)
                     if cached is not None:
                         cached_compressed, cached_ratio, cached_strategy = cached
                         if cached_ratio < min_ratio:
@@ -2486,7 +2556,7 @@ class ContentRouter(Transform):
                             any_compressed = True
                         else:
                             # Threshold tightened — move to skip
-                            self._cache.move_to_skip(content_key)
+                            self._cache.move_to_skip(content_key, tool_content)
                             new_blocks.append(block)
                             if route_counts is not None:
                                 route_counts["ratio_too_high"] += 1
@@ -2509,6 +2579,7 @@ class ContentRouter(Transform):
                         # Compressed — store in result cache
                         self._cache.put(
                             content_key,
+                            tool_content,
                             result.compressed,
                             result.compression_ratio,
                             result.strategy_used.value,
@@ -2525,7 +2596,7 @@ class ContentRouter(Transform):
                         continue
                     else:
                         # Didn't compress — add to skip set
-                        self._cache.mark_skip(content_key)
+                        self._cache.mark_skip(content_key, tool_content)
                         if route_counts is not None:
                             route_counts["ratio_too_high"] += 1
                 else:
@@ -2554,7 +2625,7 @@ class ContentRouter(Transform):
                     content_key = hash(text_content)
 
                     # Tier 1: skip set
-                    if self._cache.is_skipped(content_key):
+                    if self._cache.is_skipped(content_key, text_content):
                         new_blocks.append(block)
                         if route_counts is not None:
                             route_counts["ratio_too_high"] += 1
@@ -2563,7 +2634,7 @@ class ContentRouter(Transform):
                         continue
 
                     # Tier 2: result cache
-                    cached = self._cache.get(content_key)
+                    cached = self._cache.get(content_key, text_content)
                     if cached is not None:
                         cached_compressed, cached_ratio, cached_strategy = cached
                         if cached_ratio < min_ratio:
@@ -2575,7 +2646,7 @@ class ContentRouter(Transform):
                                 )
                             any_compressed = True
                         else:
-                            self._cache.move_to_skip(content_key)
+                            self._cache.move_to_skip(content_key, text_content)
                             new_blocks.append(block)
                             if route_counts is not None:
                                 route_counts["ratio_too_high"] += 1
@@ -2597,6 +2668,7 @@ class ContentRouter(Transform):
                     if result.compression_ratio < min_ratio:
                         self._cache.put(
                             content_key,
+                            text_content,
                             result.compressed,
                             result.compression_ratio,
                             result.strategy_used.value,
@@ -2610,7 +2682,7 @@ class ContentRouter(Transform):
                         any_compressed = True
                         continue
                     else:
-                        self._cache.mark_skip(content_key)
+                        self._cache.mark_skip(content_key, text_content)
                         if route_counts is not None:
                             route_counts["ratio_too_high"] += 1
                 else:

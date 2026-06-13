@@ -29,21 +29,23 @@ def test_compression_cache_handles_hits_skips_evictions_and_clear(
     monkeypatch.setattr(content_router_module.time, "perf_counter_ns", lambda: 50)
 
     cache = CompressionCache(ttl_seconds=10)
-    cache.put(1, "compressed", 0.4, "text")
-    cache.mark_skip(2)
+    # Cache entries now carry their originating content so reads can
+    # re-verify content equality (guards against hash collisions, F18).
+    cache.put(1, "content-one", "compressed", 0.4, "text")
+    cache.mark_skip(2, "content-two")
 
-    assert cache.get(1) == ("compressed", 0.4, "text")
-    assert cache.is_skipped(2) is True
+    assert cache.get(1, "content-one") == ("compressed", 0.4, "text")
+    assert cache.is_skipped(2, "content-two") is True
     assert cache.size == 1
     assert cache.skip_size == 1
 
-    cache.move_to_skip(1)
-    assert cache.get(1) is None
-    assert cache.is_skipped(1) is True
+    cache.move_to_skip(1, "content-one")
+    assert cache.get(1, "content-one") is None
+    assert cache.is_skipped(1, "content-one") is True
 
     # Expire both skip entries
-    assert cache.is_skipped(2) is False
-    assert cache.is_skipped(1) is False
+    assert cache.is_skipped(2, "content-two") is False
+    assert cache.is_skipped(1, "content-one") is False
 
     assert cache.stats["cache_hits"] == 1
     assert cache.stats["cache_skip_hits"] == 2
@@ -386,7 +388,9 @@ def test_diff_strategy_does_not_fallback_to_kompress_when_diff_is_noop(
     )
 
     assert compressed == diff
-    assert compressed_tokens == len(diff.split())
+    # Per-strategy token metrics are genuine subword token counts now,
+    # not whitespace word counts (F17).
+    assert compressed_tokens == content_router_module._estimate_tokens(diff)
     assert strategy_chain == ["diff"]
 
 
@@ -414,7 +418,7 @@ def test_log_strategy_does_not_fallback_to_kompress_when_log_is_noop(
     )
 
     assert compressed == log
-    assert compressed_tokens == len(log.split())
+    assert compressed_tokens == content_router_module._estimate_tokens(log)
     assert strategy_chain == ["log"]
 
 
