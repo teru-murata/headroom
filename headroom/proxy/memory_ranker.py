@@ -182,6 +182,7 @@ class RecencyBoostRanker:
                 created_at=c.created_at,
                 source=c.source,
                 related_entities=c.related_entities,
+                id=c.id,
             )
             for _, c, new_score in boosted
         ]

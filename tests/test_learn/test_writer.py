@@ -117,8 +117,10 @@ class TestClaudeCodeWriter:
         assert "src/App.tsx is huge" in content
         assert "### Build Commands" in content
         assert "cargo check from src-tauri/" in content
-        # Tokens annotation round-tripped
-        assert "*~15,000 tokens/session saved*" in content
+        # The on-disk tokens-saved annotation is writer-controllable (an
+        # interested party can hand-edit it), so it must NOT be trusted and
+        # re-emitted as an authoritative system-derived figure (F48 / NN2).
+        assert "*~15,000 tokens/session saved*" not in content
         # Still exactly one marker pair
         assert content.count(_MARKER_START) == 1
         assert content.count(_MARKER_END) == 1

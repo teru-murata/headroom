@@ -116,9 +116,15 @@ def _load_tokenizer(tokenizer_name: str):
     from transformers import AutoTokenizer
 
     try:
+        # SECURITY: do NOT trust remote code. tokenizer_name is derived from the
+        # caller-supplied model string (get_tokenizer_name), so trust_remote_code=True
+        # is an arbitrary-code-execution vector: a model name pointing at a HF repo
+        # with a malicious tokenizer module would execute on load. Standard tokenizers
+        # load fine with the default (False); only repos that demand custom code are
+        # refused, which is the safe behavior.
         return AutoTokenizer.from_pretrained(
             tokenizer_name,
-            trust_remote_code=True,
+            trust_remote_code=False,
         )
     except Exception as e:
         logger.warning(f"Failed to load tokenizer {tokenizer_name}: {e}")

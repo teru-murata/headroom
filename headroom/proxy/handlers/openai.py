@@ -5718,10 +5718,18 @@ class OpenAIHandlerMixin:
             if protect_analysis_context is not None:
                 pipeline_kwargs["protect_analysis_context"] = bool(protect_analysis_context)
 
-            result = self.openai_pipeline.apply(
-                messages=messages,
-                model=model,
-                **pipeline_kwargs,
+            # Offload the CPU-bound (Rust) compression to a worker thread so the
+            # asyncio event loop stays responsive (e.g. /livez, /readyz and other
+            # in-flight requests) for the duration of the compression. The GIL is
+            # released inside apply(), but the loop thread itself would otherwise
+            # block here. Mirrors the executor offload used on every other
+            # compression call site.
+            result = await asyncio.to_thread(
+                lambda: self.openai_pipeline.apply(
+                    messages=messages,
+                    model=model,
+                    **pipeline_kwargs,
+                )
             )
 
             return JSONResponse(

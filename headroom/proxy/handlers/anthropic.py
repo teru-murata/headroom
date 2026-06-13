@@ -1149,6 +1149,10 @@ class AnthropicHandlerMixin:
                     logger.warning(f"[{request_id}] Optimization failed: {type(e).__name__}: {e}")
                     # Flag compression failure for observability
                     _compression_failed = True
+                    # Emit an operator-facing metric: a fleet-wide compression
+                    # outage must be visible on /metrics, not only via the
+                    # per-request x-headroom-compression-failed header and log.
+                    await self.metrics.record_compression_failed()
 
             # Guard: if "optimization" inflated tokens, revert to originals.
             # Skip in cache mode where prefix-stability may legitimately shift counts.

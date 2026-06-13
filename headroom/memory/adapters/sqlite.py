@@ -9,6 +9,7 @@ Provides persistent storage for Memory objects with full support for:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sqlite3
@@ -242,28 +243,31 @@ class SQLiteMemoryStore:
         """
         row = self._memory_to_row(memory)
 
-        with self._get_conn() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO memories (
-                    id, content, user_id, session_id, agent_id, turn_id,
-                    created_at, valid_from, valid_until,
-                    category, importance,
-                    supersedes, superseded_by, promoted_from, promotion_chain,
-                    access_count, last_accessed,
-                    entity_refs, embedding, metadata
-                ) VALUES (
-                    :id, :content, :user_id, :session_id, :agent_id, :turn_id,
-                    :created_at, :valid_from, :valid_until,
-                    :category, :importance,
-                    :supersedes, :superseded_by, :promoted_from, :promotion_chain,
-                    :access_count, :last_accessed,
-                    :entity_refs, :embedding, :metadata
+        def _run() -> None:
+            with self._get_conn() as conn:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO memories (
+                        id, content, user_id, session_id, agent_id, turn_id,
+                        created_at, valid_from, valid_until,
+                        category, importance,
+                        supersedes, superseded_by, promoted_from, promotion_chain,
+                        access_count, last_accessed,
+                        entity_refs, embedding, metadata
+                    ) VALUES (
+                        :id, :content, :user_id, :session_id, :agent_id, :turn_id,
+                        :created_at, :valid_from, :valid_until,
+                        :category, :importance,
+                        :supersedes, :superseded_by, :promoted_from, :promotion_chain,
+                        :access_count, :last_accessed,
+                        :entity_refs, :embedding, :metadata
+                    )
+                    """,
+                    row,
                 )
-                """,
-                row,
-            )
-            conn.commit()
+                conn.commit()
+
+        await asyncio.to_thread(_run)
 
     async def save_batch(self, memories: list[Memory]) -> None:
         """Save multiple memories in a single transaction.
@@ -276,28 +280,31 @@ class SQLiteMemoryStore:
 
         rows = [self._memory_to_row(m) for m in memories]
 
-        with self._get_conn() as conn:
-            conn.executemany(
-                """
-                INSERT OR REPLACE INTO memories (
-                    id, content, user_id, session_id, agent_id, turn_id,
-                    created_at, valid_from, valid_until,
-                    category, importance,
-                    supersedes, superseded_by, promoted_from, promotion_chain,
-                    access_count, last_accessed,
-                    entity_refs, embedding, metadata
-                ) VALUES (
-                    :id, :content, :user_id, :session_id, :agent_id, :turn_id,
-                    :created_at, :valid_from, :valid_until,
-                    :category, :importance,
-                    :supersedes, :superseded_by, :promoted_from, :promotion_chain,
-                    :access_count, :last_accessed,
-                    :entity_refs, :embedding, :metadata
+        def _run() -> None:
+            with self._get_conn() as conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO memories (
+                        id, content, user_id, session_id, agent_id, turn_id,
+                        created_at, valid_from, valid_until,
+                        category, importance,
+                        supersedes, superseded_by, promoted_from, promotion_chain,
+                        access_count, last_accessed,
+                        entity_refs, embedding, metadata
+                    ) VALUES (
+                        :id, :content, :user_id, :session_id, :agent_id, :turn_id,
+                        :created_at, :valid_from, :valid_until,
+                        :category, :importance,
+                        :supersedes, :superseded_by, :promoted_from, :promotion_chain,
+                        :access_count, :last_accessed,
+                        :entity_refs, :embedding, :metadata
+                    )
+                    """,
+                    rows,
                 )
-                """,
-                rows,
-            )
-            conn.commit()
+                conn.commit()
+
+        await asyncio.to_thread(_run)
 
     async def get(self, memory_id: str) -> Memory | None:
         """Retrieve a memory by ID.
@@ -308,17 +315,20 @@ class SQLiteMemoryStore:
         Returns:
             The memory if found, None otherwise.
         """
-        with self._get_conn() as conn:
-            cursor = conn.execute(
-                "SELECT * FROM memories WHERE id = ?",
-                (memory_id,),
-            )
-            row = cursor.fetchone()
+        def _run() -> Memory | None:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "SELECT * FROM memories WHERE id = ?",
+                    (memory_id,),
+                )
+                row = cursor.fetchone()
 
-            if row is None:
-                return None
+                if row is None:
+                    return None
 
-            return self._row_to_memory(row)
+                return self._row_to_memory(row)
+
+        return await asyncio.to_thread(_run)
 
     async def get_batch(self, memory_ids: list[str]) -> list[Memory]:
         """Retrieve multiple memories by ID.
@@ -334,13 +344,16 @@ class SQLiteMemoryStore:
 
         placeholders = ", ".join("?" * len(memory_ids))
 
-        with self._get_conn() as conn:
-            cursor = conn.execute(
-                f"SELECT * FROM memories WHERE id IN ({placeholders})",  # nosec B608
-                memory_ids,
-            )
+        def _run() -> list[Memory]:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    f"SELECT * FROM memories WHERE id IN ({placeholders})",  # nosec B608
+                    memory_ids,
+                )
 
-            return [self._row_to_memory(row) for row in cursor]
+                return [self._row_to_memory(row) for row in cursor]
+
+        return await asyncio.to_thread(_run)
 
     async def delete(self, memory_id: str) -> bool:
         """Delete a memory by ID.
@@ -351,13 +364,16 @@ class SQLiteMemoryStore:
         Returns:
             True if the memory was deleted, False if not found.
         """
-        with self._get_conn() as conn:
-            cursor = conn.execute(
-                "DELETE FROM memories WHERE id = ?",
-                (memory_id,),
-            )
-            conn.commit()
-            return cursor.rowcount > 0
+        def _run() -> bool:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    "DELETE FROM memories WHERE id = ?",
+                    (memory_id,),
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+
+        return await asyncio.to_thread(_run)
 
     async def delete_batch(self, memory_ids: list[str]) -> int:
         """Delete multiple memories by ID.
@@ -373,13 +389,16 @@ class SQLiteMemoryStore:
 
         placeholders = ", ".join("?" * len(memory_ids))
 
-        with self._get_conn() as conn:
-            cursor = conn.execute(
-                f"DELETE FROM memories WHERE id IN ({placeholders})",  # nosec B608
-                memory_ids,
-            )
-            conn.commit()
-            return cursor.rowcount
+        def _run() -> int:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    f"DELETE FROM memories WHERE id IN ({placeholders})",  # nosec B608
+                    memory_ids,
+                )
+                conn.commit()
+                return cursor.rowcount
+
+        return await asyncio.to_thread(_run)
 
     def _build_query_conditions(self, filter: MemoryFilter) -> tuple[list[str], list[Any]]:
         """Build WHERE clause conditions from a MemoryFilter.
@@ -564,9 +583,12 @@ class SQLiteMemoryStore:
             query += " OFFSET ?"
             params.append(filter.offset)
 
-        with self._get_conn() as conn:
-            cursor = conn.execute(query, params)
-            return [self._row_to_memory(row) for row in cursor]
+        def _run() -> list[Memory]:
+            with self._get_conn() as conn:
+                cursor = conn.execute(query, params)
+                return [self._row_to_memory(row) for row in cursor]
+
+        return await asyncio.to_thread(_run)
 
     async def count(self, filter: MemoryFilter) -> int:
         """Count memories matching the given filter.
@@ -583,10 +605,13 @@ class SQLiteMemoryStore:
 
         query = f"SELECT COUNT(*) FROM memories WHERE {where_clause}"
 
-        with self._get_conn() as conn:
-            cursor = conn.execute(query, params)
-            result = cursor.fetchone()[0]
-            return int(result)
+        def _run() -> int:
+            with self._get_conn() as conn:
+                cursor = conn.execute(query, params)
+                result = cursor.fetchone()[0]
+                return int(result)
+
+        return await asyncio.to_thread(_run)
 
     async def supersede(
         self,
@@ -627,40 +652,44 @@ class SQLiteMemoryStore:
         new_memory.valid_from = supersede_time
 
         # Save both in a transaction
-        with self._get_conn() as conn:
-            # Update old memory
-            conn.execute(
-                """
-                UPDATE memories
-                SET valid_until = ?, superseded_by = ?
-                WHERE id = ?
-                """,
-                (supersede_time.isoformat(), new_memory.id, old_memory_id),
-            )
+        row = self._memory_to_row(new_memory)
 
-            # Insert new memory
-            row = self._memory_to_row(new_memory)
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO memories (
-                    id, content, user_id, session_id, agent_id, turn_id,
-                    created_at, valid_from, valid_until,
-                    category, importance,
-                    supersedes, superseded_by, promoted_from, promotion_chain,
-                    access_count, last_accessed,
-                    entity_refs, embedding, metadata
-                ) VALUES (
-                    :id, :content, :user_id, :session_id, :agent_id, :turn_id,
-                    :created_at, :valid_from, :valid_until,
-                    :category, :importance,
-                    :supersedes, :superseded_by, :promoted_from, :promotion_chain,
-                    :access_count, :last_accessed,
-                    :entity_refs, :embedding, :metadata
+        def _run() -> None:
+            with self._get_conn() as conn:
+                # Update old memory
+                conn.execute(
+                    """
+                    UPDATE memories
+                    SET valid_until = ?, superseded_by = ?
+                    WHERE id = ?
+                    """,
+                    (supersede_time.isoformat(), new_memory.id, old_memory_id),
                 )
-                """,
-                row,
-            )
-            conn.commit()
+
+                # Insert new memory
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO memories (
+                        id, content, user_id, session_id, agent_id, turn_id,
+                        created_at, valid_from, valid_until,
+                        category, importance,
+                        supersedes, superseded_by, promoted_from, promotion_chain,
+                        access_count, last_accessed,
+                        entity_refs, embedding, metadata
+                    ) VALUES (
+                        :id, :content, :user_id, :session_id, :agent_id, :turn_id,
+                        :created_at, :valid_from, :valid_until,
+                        :category, :importance,
+                        :supersedes, :superseded_by, :promoted_from, :promotion_chain,
+                        :access_count, :last_accessed,
+                        :entity_refs, :embedding, :metadata
+                    )
+                    """,
+                    row,
+                )
+                conn.commit()
+
+        await asyncio.to_thread(_run)
 
         return new_memory
 
@@ -745,13 +774,16 @@ class SQLiteMemoryStore:
 
         where_clause = " AND ".join(conditions)
 
-        with self._get_conn() as conn:
-            cursor = conn.execute(
-                f"DELETE FROM memories WHERE {where_clause}",  # nosec B608
-                params,
-            )
-            conn.commit()
-            return cursor.rowcount
+        def _run() -> int:
+            with self._get_conn() as conn:
+                cursor = conn.execute(
+                    f"DELETE FROM memories WHERE {where_clause}",  # nosec B608
+                    params,
+                )
+                conn.commit()
+                return cursor.rowcount
+
+        return await asyncio.to_thread(_run)
 
     async def clear_all(self) -> int:
         """Clear all memories from the store.
@@ -759,10 +791,14 @@ class SQLiteMemoryStore:
         Returns:
             Number of memories deleted.
         """
-        with self._get_conn() as conn:
-            cursor = conn.execute("DELETE FROM memories")
-            conn.commit()
-            return cursor.rowcount
+
+        def _run() -> int:
+            with self._get_conn() as conn:
+                cursor = conn.execute("DELETE FROM memories")
+                conn.commit()
+                return cursor.rowcount
+
+        return await asyncio.to_thread(_run)
 
     def count_sync(self) -> int:
         """Synchronous count of all memories (for diagnostics).

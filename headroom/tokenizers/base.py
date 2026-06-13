@@ -55,6 +55,12 @@ class BaseTokenizer(ABC):
     MESSAGE_OVERHEAD = 4
     REPLY_OVERHEAD = 3  # Assistant reply start tokens
 
+    # Whether this counter returns estimated (vs. exact) token counts.
+    # Exact backends (tiktoken, HuggingFace, ...) leave this False; heuristic
+    # fallbacks set it True so callers can detect when exact tokenization has
+    # degraded to estimation (risk of silent context-window overflow).
+    is_estimate: bool = False
+
     @abstractmethod
     def count_text(self, text: str) -> int:
         """Count tokens in a text string. Must be implemented by subclasses."""

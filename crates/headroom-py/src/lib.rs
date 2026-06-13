@@ -33,13 +33,14 @@ use headroom_core::transforms::{
     summarize_openai_responses_no_change_reason as rust_summarize_openai_responses_no_change_reason,
     AuthMode as RustLiveZoneAuthMode, ContentType as RustContentType,
     DetectionResult as RustDetectionResult, DiffCompressionResult, DiffCompressor,
-    DiffCompressorConfig, DiffCompressorStats, LiveZoneOutcome,
+    DiffCompressorConfig, DiffCompressorStats, LiveZoneError, LiveZoneOutcome,
     LogCompressionResult as RustLogResult, LogCompressor as RustLogCompressor,
     LogCompressorConfig as RustLogConfig, LogCompressorStats as RustLogStats,
     LogFormat as RustLogFormat, LogLevel as RustLogLevel,
     SearchCompressionResult as RustSearchResult, SearchCompressor as RustSearchCompressor,
     SearchCompressorConfig as RustSearchConfig, SearchCompressorStats as RustSearchStats,
 };
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyString};
 
@@ -734,33 +735,45 @@ impl PySmartCrusher {
         items_json: &str,
         query: &str,
         bias: f64,
-    ) -> Bound<'py, PyDict> {
+    ) -> PyResult<Bound<'py, PyDict>> {
         // GIL-release pattern: own the inputs, do all heavy compute
         // (JSON parse, crush, re-serialize) without the GIL, then
         // re-acquire to build the PyDict from the owned outputs.
+        //
+        // Caller-supplied JSON is RECOVERABLE input, not an invariant
+        // violation: malformed or non-array text must surface as a clean
+        // `ValueError` (matching the Python mirror and the crate's
+        // `score_line`/`ctx_from_str` convention), never a pyo3
+        // PanicException that escapes `except ValueError`.
         let items_json = items_json.to_string();
         let query = query.to_string();
         let (kept_json, ccr_hash, dropped_summary, strategy_info, compacted, compaction_kind) = py
-            .allow_threads(|| {
+            .allow_threads(|| -> Result<_, String> {
                 let parsed: serde_json::Value = serde_json::from_str(&items_json)
-                    .unwrap_or_else(|e| panic!("items_json must be JSON: {e}"));
+                    .map_err(|e| format!("items_json must be JSON: {e}"))?;
                 let items = match parsed {
                     serde_json::Value::Array(a) => a,
-                    other => panic!("items_json must be a JSON array, got {}", type_name(&other)),
+                    other => {
+                        return Err(format!(
+                            "items_json must be a JSON array, got {}",
+                            type_name(&other)
+                        ))
+                    }
                 };
                 let result = self.inner.crush_array(&items, &query, bias);
                 let kept_json = serde_json::to_string(&serde_json::Value::Array(result.items))
-                    .expect("serialize kept items");
-                (
+                    .map_err(|e| format!("serialize kept items: {e}"))?;
+                Ok((
                     kept_json,
                     result.ccr_hash,
                     result.dropped_summary,
                     result.strategy_info,
                     result.compacted,
                     result.compaction_kind,
-                )
-            });
-        build_crush_array_dict(
+                ))
+            })
+            .map_err(PyValueError::new_err)?;
+        Ok(build_crush_array_dict(
             py,
             kept_json,
             ccr_hash,
@@ -768,7 +781,7 @@ impl PySmartCrusher {
             strategy_info,
             compacted,
             compaction_kind,
-        )
+        ))
     }
 
     /// Run the document-level walker on `doc_json` (JSON string) and
@@ -784,20 +797,24 @@ impl PySmartCrusher {
     /// pass without per-array lossy crushing — useful when the caller
     /// wants document-shape compaction (forms, configs, mixed records)
     /// rather than statistical row drop.
-    fn compact_document_json(&self, py: Python<'_>, doc_json: &str) -> String {
+    fn compact_document_json(&self, py: Python<'_>, doc_json: &str) -> PyResult<String> {
         // Heavy: JSON parse + recursive walker + tabular compaction +
         // re-serialize. None of it touches Python; release the GIL.
+        //
+        // Malformed `doc_json` is recoverable caller input -> clean
+        // `ValueError`, not a pyo3 PanicException.
         let doc_json = doc_json.to_string();
-        py.allow_threads(|| {
+        py.allow_threads(|| -> Result<String, String> {
             let parsed: serde_json::Value = serde_json::from_str(&doc_json)
-                .unwrap_or_else(|e| panic!("doc_json must be JSON: {e}"));
+                .map_err(|e| format!("doc_json must be JSON: {e}"))?;
             let mut dc = DocumentCompactor::new();
             if let Some(store) = self.inner.ccr_store() {
                 dc = dc.with_ccr_store(store.clone());
             }
             let out = dc.compact(parsed);
-            serde_json::to_string(&out).expect("serialize compacted document")
+            serde_json::to_string(&out).map_err(|e| format!("serialize compacted document: {e}"))
         })
+        .map_err(PyValueError::new_err)
     }
 
     /// Look up an original payload by CCR hash.
@@ -1547,15 +1564,23 @@ fn compress_openai_responses_live_zone(
                 None,
             )
         }
-        Err(_) => {
-            // BodyNotJson / NoMessagesArray are non-fatal: nothing to
-            // compress, fall through to passthrough byte-for-byte.
+        Err(e) => {
+            // BodyNotJson / NoMessagesArray are non-fatal passthrough
+            // conditions, but each is a DISTINCT operator-visible signal
+            // (mirroring the proxy's `reason = "not_json" | "no_messages"`).
+            // Collapsing every variant into one opaque token would hide a
+            // genuine dispatcher fault behind benign passthrough, so map each
+            // variant explicitly and never use a catch-all reason.
+            let reason = match e {
+                LiveZoneError::BodyNotJson(_) => "not_json",
+                LiveZoneError::NoMessagesArray => "no_messages",
+            };
             (
                 PyBytes::new_bound(py, body).unbind(),
                 false,
                 0,
                 Vec::new(),
-                Some("dispatch_error".to_string()),
+                Some(reason.to_string()),
             )
         }
     }

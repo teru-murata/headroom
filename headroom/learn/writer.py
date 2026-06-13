@@ -79,7 +79,14 @@ def _build_section(recommendations: list[Recommendation]) -> str:
     for rec in recommendations:
         lines.append(f"### {rec.section}")
         if rec.estimated_tokens_saved > 0:
-            lines.append(f"*~{rec.estimated_tokens_saved:,} tokens/session saved*")
+            # The savings figure is the model's own self-reported estimate; it is
+            # NOT independently measured against actual session deltas. Label it
+            # as model-claimed / unverified so the user is not shown an LLM's
+            # self-grade as a quantified fact (NN1, F47).
+            lines.append(
+                f"*~{rec.estimated_tokens_saved:,} tokens/session saved "
+                "(model-claimed, unverified)*"
+            )
         lines.append(rec.content)
         lines.append("")
 
@@ -87,8 +94,9 @@ def _build_section(recommendations: list[Recommendation]) -> str:
     return "\n".join(lines)
 
 
-# Matches the "*~N tokens/session saved*" annotation emitted by _build_section.
-_TOKENS_ANNOTATION_PATTERN = re.compile(r"\*~([\d,]+) tokens/session saved\*\n?")
+# Matches the "*~N tokens/session saved ...*" annotation emitted by
+# _build_section (with or without the model-claimed/unverified qualifier).
+_TOKENS_ANNOTATION_PATTERN = re.compile(r"\*~([\d,]+) tokens/session saved[^*\n]*\*\n?")
 
 
 def extract_marker_block(file_content: str) -> str | None:
@@ -122,10 +130,15 @@ def _parse_prior_recommendations(existing: str) -> list[Recommendation]:
         if not heading:
             continue
 
-        tokens_saved = 0
+        # The "*~N tokens/session saved*" annotation in the on-disk file is
+        # writer-controllable (the context file is freely editable by the
+        # user/repo, an interested party). We must NOT reconstruct an
+        # authoritative savings figure from it — a hand-edited number would
+        # round-trip back into Headroom's output as if it were system-derived
+        # (F48 / NN2). Strip the annotation and carry the section forward with
+        # no inherited savings figure.
         tokens_match = _TOKENS_ANNOTATION_PATTERN.match(body)
         if tokens_match:
-            tokens_saved = int(tokens_match.group(1).replace(",", ""))
             body = body[tokens_match.end() :]
 
         recs.append(
@@ -133,7 +146,7 @@ def _parse_prior_recommendations(existing: str) -> list[Recommendation]:
                 target=RecommendationTarget.CONTEXT_FILE,
                 section=heading,
                 content=body.rstrip(),
-                estimated_tokens_saved=tokens_saved,
+                estimated_tokens_saved=0,
             )
         )
     return recs

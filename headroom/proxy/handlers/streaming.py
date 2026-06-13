@@ -955,6 +955,13 @@ class StreamingMixin:
             error_msg = str(e) or repr(e)
             logger.error(f"[{request_id}] Connection error to upstream API: {error_msg}")
 
+            # Record a failed outcome so a streaming upstream outage shows up in
+            # headroom_requests_failed_total — mirrors the non-stream path
+            # (anthropic.py record_failed). Without this, every streaming request
+            # can be failing while requests_failed stays flat and the inbound
+            # middleware logs HTTP 200 for the SSE error frame.
+            await self.metrics.record_failed(provider=provider)
+
             async def _error_gen():
                 error_event = {
                     "type": "error",

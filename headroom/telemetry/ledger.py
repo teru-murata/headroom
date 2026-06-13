@@ -8,6 +8,8 @@ Headroom.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -21,6 +23,8 @@ from typing import Any, ClassVar
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = "ledger-event-v0"
+_SIGNATURE_KEY_ENV = "HEADROOM_LEDGER_SIGNING_KEY"
+_LOCAL_INSTANCE_SECRET = uuid.uuid4().hex
 DEFAULT_EVENT_GRADE = "source"
 DEFAULT_DEPLOYMENT_MODE = "local_dev"
 DEFAULT_BRIDGE_INSTANCE_ID = "headroom-local"
@@ -44,6 +48,25 @@ def estimate_tokens(text: str) -> int:
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _signing_key() -> bytes:
+    """Return the local ledger signing key.
+
+    Prefers an operator-provided key; otherwise uses a per-process instance
+    secret so an on-disk record cannot be re-signed from outside the process.
+    """
+    configured = os.environ.get(_SIGNATURE_KEY_ENV)
+    if configured and configured.strip():
+        return configured.strip().encode("utf-8")
+    return _LOCAL_INSTANCE_SECRET.encode("utf-8")
+
+
+def _sign_record(record: dict[str, Any]) -> str:
+    """Compute an HMAC over the canonical (signature-excluded) record bytes."""
+    payload = {k: v for k, v in record.items() if k != "signature"}
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hmac.new(_signing_key(), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def _env_bool(name: str, *, default: bool) -> bool:
@@ -123,11 +146,20 @@ class LedgerEvent:
 
     @classmethod
     def create(cls, event_type: str, **fields: Any) -> LedgerEvent:
-        """Create an event with explicit local defaults for required fields."""
-        occurred_at = str(fields.pop("occurred_at", _utc_now()))
-        tenant_id = str(
-            fields.pop("tenant_id", _env_default("HEADROOM_LEDGER_TENANT_ID", _LOCAL_DEFAULT))
-        )
+        """Create an event with explicit local defaults for required fields.
+
+        Provenance-critical fields are bound to local/server authority rather
+        than trusted from the caller (NN2). ``occurred_at`` is always stamped
+        from the server clock and ``tenant_id`` is resolved from local
+        authority; any caller-supplied values for these are dropped so an
+        interested producer cannot mint forged provenance.
+        """
+        # Server-authority clock: a caller-supplied occurred_at is never trusted.
+        fields.pop("occurred_at", None)
+        occurred_at = _utc_now()
+        # Tenant is bound to local/authenticated authority, never to a caller value.
+        fields.pop("tenant_id", None)
+        tenant_id = str(_env_default("HEADROOM_LEDGER_TENANT_ID", _LOCAL_DEFAULT))
         project_id = str(
             fields.pop("project_id", _env_default("HEADROOM_LEDGER_PROJECT_ID", _LOCAL_DEFAULT))
         )
@@ -242,15 +274,29 @@ class JsonlLedgerEmitter(LedgerEmitter):
         super().__init__()
         self.path = Path(path)
         self.strict = strict
+        # Surfaced health signal: counts provenance events dropped on write
+        # failure so silent degradation is observable to operators (NN4).
+        self.dropped_events = 0
+
+    def _signed_json(self, event: LedgerEvent) -> str:
+        record = event.to_dict()
+        record["signature"] = _sign_record(record)
+        return json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     def _emit(self, event: LedgerEvent) -> None:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(event.to_json())
+                handle.write(self._signed_json(event))
                 handle.write("\n")
         except Exception as exc:
-            logger.warning("Ledger JSONL write failed for %s: %s", self.path, exc)
+            self.dropped_events += 1
+            logger.warning(
+                "Ledger JSONL write failed for %s (dropped_events=%d): %s",
+                self.path,
+                self.dropped_events,
+                exc,
+            )
             if self.strict:
                 raise
 

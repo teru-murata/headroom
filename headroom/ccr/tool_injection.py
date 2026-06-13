@@ -486,6 +486,15 @@ def parse_tool_call(
         return None, None
 
     try:
+        # INTENTIONAL: validation is delegated to normalize_ccr_hash, which
+        # accepts both 12- and 24-hex CCR hashes by design (see markers.py).
+        # This deliberately replaced the 24-hex-only regex so SmartCrusher's
+        # retrievable 12-hex markers resolve here. Do NOT re-add a 24-hex-only
+        # gate on this untrusted-LLM retrieve path: it would break SmartCrusher
+        # retrieval. The cross-tenant protection for hosted/SaaS use is the
+        # per-request tenant-scoped store (compression_store._request_ccr_store),
+        # which bounds what any supplied hash can reach to the caller's tenant —
+        # that, not hash length, is the anti-spoof axis to enforce here.
         hash_key = normalize_ccr_hash(hash_value)
     except ValueError:
         return None, None

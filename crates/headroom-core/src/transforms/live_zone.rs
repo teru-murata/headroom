@@ -87,12 +87,15 @@
 //!
 //! # AuthMode
 //!
-//! The `AuthMode` parameter is taken in B3 but unused — Phase F
-//! PR-F2 wires the gate (PAYG/OAuth/Subscription each demand
-//! different policies; see project memory
-//! `project_auth_mode_compression_nuances.md`). Keeping the
-//! parameter in the signature now means later PRs are pure
-//! implementation swaps, not signature redesigns.
+//! The `AuthMode` parameter gates lossy compression. `OAuth` and
+//! `Subscription` are a documented lossless-only path (see
+//! `auth_mode.rs` and `AuthMode::allows_lossy_compression`), so the
+//! dispatcher skips the lossy compressors (SmartCrusher row-drop,
+//! Log, Search, Diff) for those modes and forwards the block
+//! verbatim. `Payg`/`Unknown` get the full compression budget. Finer
+//! per-mode policies (PAYG/OAuth/Subscription) remain a Phase F
+//! follow-up; see project memory
+//! `project_auth_mode_compression_nuances.md`.
 
 use std::{collections::HashSet, sync::OnceLock};
 
@@ -225,6 +228,22 @@ impl AuthMode {
             AuthMode::Unknown => "unknown",
         }
     }
+
+    /// Whether lossy compressors (SmartCrusher row-drop, Log, Search,
+    /// Diff) may run for this auth mode.
+    ///
+    /// `OAuth` and `Subscription` are documented (see `auth_mode.rs`
+    /// and this module's `# AuthMode` section) as a "no lossy
+    /// compressors. Lossless-only path." — lossy row-drop / rewrite on
+    /// those modes can break the per-account routing and cache pinning
+    /// the OAuth/subscription headers depend on. `Payg` (and `Unknown`,
+    /// which the dispatcher treats as PAYG) get the full budget.
+    pub fn allows_lossy_compression(self) -> bool {
+        match self {
+            AuthMode::Payg | AuthMode::Unknown => true,
+            AuthMode::OAuth | AuthMode::Subscription => false,
+        }
+    }
 }
 
 /// Map F1's classifier output (`crate::auth_mode::AuthMode`) to the
@@ -281,13 +300,28 @@ pub enum BlockAction {
         /// `"log_compressor"`, ...). Static so the manifest is
         /// allocation-light.
         strategy: &'static str,
+        /// Detected content tier this block was classified as —
+        /// string tag matches `ContentType::as_str`
+        /// (`"source_code"`, `"json_array"`, `"diff"`, `"text"`, ...).
+        /// F59 remediation: the proxy's
+        /// `proxy_compression_ratio_by_strategy` metric defines its
+        /// `content_type` axis as the detection tier, so the manifest
+        /// must surface the genuine detected tier per compressed block
+        /// instead of the emit-site hardcoding `"aggregate"`.
+        content_type: &'static str,
         /// Bytes of the original block content (the JSON string
         /// value, after unescaping).
         original_bytes: usize,
         /// Bytes of the replacement block content.
         compressed_bytes: usize,
-        /// Tokens in the original block content (per the model's
-        /// tokenizer).
+        /// Tokens in the original block content. Measured by the
+        /// model's real tokenizer when one is available
+        /// (`Backend::Tiktoken` / a registered `Backend::HuggingFace`);
+        /// for models without a published tokenizer — notably every
+        /// `claude-*` name, which routes to `Backend::Estimation` — this
+        /// is a calibrated `chars / cpt` *estimate*, not a measured
+        /// count. Use [`CompressionManifest::token_counts_are_estimated`]
+        /// (with the same `model`) to tell which.
         original_tokens: usize,
         /// Tokens in the replacement block content. Always strictly
         /// less than `original_tokens` for this variant — the
@@ -391,6 +425,31 @@ impl CompressionManifest {
             .any(|b| matches!(b.action, BlockAction::Compressed { .. }))
     }
 
+    /// Whether the per-block token counts that feed [`tokens_saved`]
+    /// are *estimates* rather than measured tokenizer output, for the
+    /// given `model`.
+    ///
+    /// The dispatcher counts tokens with `get_tokenizer(model)`. For
+    /// OpenAI / o-series models that is a real BPE tokenizer
+    /// (`Backend::Tiktoken`, byte-identical to Python `tiktoken`); for
+    /// a model with a registered HuggingFace tokenizer it is a real
+    /// BPE/Unigram count. But every `claude-*` model — and any other
+    /// family without a published or registered tokenizer — falls back
+    /// to the calibrated `chars / cpt` estimator
+    /// (`Backend::Estimation`). For those, the headline `tokens_saved()`
+    /// figure is an *estimate*, not a tokenizer-measured truth, and
+    /// callers/operators should label it as such. Returns `true` when
+    /// the count is estimated.
+    ///
+    /// Pass the same `model` string the request was dispatched with
+    /// (e.g. [`DEFAULT_MODEL`] when the proxy could not extract
+    /// `body["model"]`).
+    ///
+    /// [`tokens_saved`]: Self::tokens_saved
+    pub fn token_counts_are_estimated(model: &str) -> bool {
+        get_tokenizer(model).backend() == crate::tokenizer::Backend::Estimation
+    }
+
     /// Aggregate `original_tokens − compressed_tokens` across every
     /// `BlockAction::Compressed` outcome. Zero when no block was
     /// rewritten. Saturating subtraction guards against the
@@ -398,6 +457,14 @@ impl CompressionManifest {
     /// reports compressed > original (the dispatcher's
     /// `RejectedNotSmaller` gate should make this unreachable, but the
     /// saturating arithmetic keeps callers panic-free).
+    ///
+    /// NOTE: these are *tokenizer-measured* counts only for models with
+    /// a real tokenizer. For `claude-*` (the dominant traffic) the
+    /// counts are calibrated estimates — see
+    /// [`token_counts_are_estimated`]. Report the figure as an estimate
+    /// for those models rather than as a measured savings.
+    ///
+    /// [`token_counts_are_estimated`]: Self::token_counts_are_estimated
     pub fn tokens_saved(&self) -> usize {
         self.block_outcomes
             .iter()
@@ -602,7 +669,10 @@ fn diff_compressor() -> &'static DiffCompressor {
 ///   UTF-8 JSON; non-JSON returns [`LiveZoneError::BodyNotJson`].
 /// - `frozen_message_count`: hot-zone floor. Indices `< floor` are
 ///   excluded from dispatch.
-/// - `_auth_mode`: reserved for PR-F2; B3 ignores it.
+/// - `auth_mode`: gates lossy compression. `OAuth`/`Subscription`
+///   are a documented lossless-only path (see `# AuthMode`), so
+///   lossy compressors are skipped for them; `Payg`/`Unknown` get
+///   the full compression budget.
 /// - `model`: the upstream model name (e.g. `"claude-3-5-sonnet-20241022"`).
 ///   Routes the tokenizer registry to the right backend for the
 ///   per-block token-count check (PR-B4). Pass [`DEFAULT_MODEL`] when
@@ -643,7 +713,7 @@ pub fn compress_anthropic_live_zone(
 pub fn compress_anthropic_live_zone_with_ccr(
     body_raw: &[u8],
     frozen_message_count: usize,
-    _auth_mode: AuthMode,
+    auth_mode: AuthMode,
     model: &str,
     ccr_store: Option<&dyn CcrStore>,
 ) -> Result<LiveZoneOutcome, LiveZoneError> {
@@ -735,6 +805,7 @@ pub fn compress_anthropic_live_zone_with_ccr(
                     Some(slot.block_index),
                     block_type,
                     tokenizer.as_ref(),
+                    auth_mode,
                     &mut replacements,
                     ccr_store,
                 );
@@ -753,6 +824,7 @@ pub fn compress_anthropic_live_zone_with_ccr(
                     None,
                     "string_content".to_string(),
                     tokenizer.as_ref(),
+                    auth_mode,
                     &mut replacements,
                     ccr_store,
                 )
@@ -827,6 +899,7 @@ fn compress_one_block(
     block_index: Option<usize>,
     block_type: String,
     tokenizer: &dyn crate::tokenizer::Tokenizer,
+    auth_mode: AuthMode,
     replacements: &mut Vec<Replacement>,
     ccr_store: Option<&dyn CcrStore>,
 ) -> BlockOutcome {
@@ -847,7 +920,7 @@ fn compress_one_block(
         };
     }
 
-    match dispatch_compressor(content_text, content_type) {
+    match dispatch_compressor(content_text, content_type, auth_mode) {
         DispatchResult::NoOp { content_type } => BlockOutcome {
             message_index,
             block_index,
@@ -920,6 +993,7 @@ fn compress_one_block(
                     block_type,
                     action: BlockAction::Compressed {
                         strategy,
+                        content_type: content_type.as_str(),
                         original_bytes,
                         compressed_bytes,
                         original_tokens,
@@ -1299,8 +1373,25 @@ enum DispatchResult {
 /// - `SourceCode` → no-op (Rust port pending; see TODO below)
 /// - `PlainText` → no-op (PR-B4 wires Kompress)
 /// - `Html` → no-op (no compressor)
-fn dispatch_compressor(text: &str, content_type: ContentType) -> DispatchResult {
+fn dispatch_compressor(
+    text: &str,
+    content_type: ContentType,
+    auth_mode: AuthMode,
+) -> DispatchResult {
     if text.is_empty() {
+        return DispatchResult::NoOp {
+            content_type: content_type.as_str(),
+        };
+    }
+
+    // Lossless-only gate (finding F54): OAuth/Subscription are
+    // documented as a "no lossy compressors. Lossless-only path."
+    // Every compressor wired below (SmartCrusher row-drop, Log,
+    // Search, Diff) is lossy, so for those auth modes we never invoke
+    // them — the block is forwarded verbatim. PAYG keeps the full
+    // budget. When a lossless compressor (e.g. Kompress) is wired,
+    // it should bypass this gate explicitly.
+    if !auth_mode.allows_lossy_compression() {
         return DispatchResult::NoOp {
             content_type: content_type.as_str(),
         };
@@ -1676,6 +1767,7 @@ mod tests {
         let m = make_manifest(vec![
             BlockAction::Compressed {
                 strategy: "smart_crusher",
+                content_type: "json_array",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 100,
@@ -1686,6 +1778,7 @@ mod tests {
             },
             BlockAction::Compressed {
                 strategy: "log_compressor",
+                content_type: "build",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 200,
@@ -1708,6 +1801,7 @@ mod tests {
         let m = make_manifest(vec![
             BlockAction::Compressed {
                 strategy: "log_compressor",
+                content_type: "build",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 50,
@@ -1715,6 +1809,7 @@ mod tests {
             },
             BlockAction::Compressed {
                 strategy: "smart_crusher",
+                content_type: "json_array",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 50,
@@ -1722,6 +1817,7 @@ mod tests {
             },
             BlockAction::Compressed {
                 strategy: "log_compressor",
+                content_type: "build",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 50,
@@ -1741,6 +1837,7 @@ mod tests {
         // future caller hand-constructs such a manifest.
         let m = make_manifest(vec![BlockAction::Compressed {
             strategy: "smart_crusher",
+            content_type: "json_array",
             original_bytes: 0,
             compressed_bytes: 0,
             original_tokens: 10,
@@ -1791,7 +1888,7 @@ mod tests {
 /// equality on the prefix and suffix.
 pub fn compress_openai_chat_live_zone(
     body_raw: &[u8],
-    _auth_mode: AuthMode,
+    auth_mode: AuthMode,
     model: &str,
 ) -> Result<LiveZoneOutcome, LiveZoneError> {
     let parsed: Value = serde_json::from_slice(body_raw).map_err(LiveZoneError::BodyNotJson)?;
@@ -1869,6 +1966,7 @@ pub fn compress_openai_chat_live_zone(
             slot.block_index,
             slot.block_type,
             tokenizer.as_ref(),
+            auth_mode,
             &mut replacements,
             None, // PR-C2: no CCR store yet on the OpenAI path.
         );
@@ -2248,7 +2346,7 @@ const RESPONSES_OUTPUT_MIN_BYTES: usize = 512;
 /// input, never re-serialized.
 pub fn compress_openai_responses_live_zone(
     body_raw: &[u8],
-    _auth_mode: AuthMode,
+    auth_mode: AuthMode,
     model: &str,
 ) -> Result<LiveZoneOutcome, LiveZoneError> {
     let parsed: Value = serde_json::from_slice(body_raw).map_err(LiveZoneError::BodyNotJson)?;
@@ -2379,6 +2477,7 @@ pub fn compress_openai_responses_live_zone(
             slot.block_index,
             slot.block_type,
             tokenizer.as_ref(),
+            auth_mode,
             &mut replacements,
             None, // PR-C3: no CCR store on the Responses path yet.
         );

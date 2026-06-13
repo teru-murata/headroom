@@ -209,6 +209,10 @@ class CodingAgentPreset:
     ) -> None:
         self.config = config or CodingAgentPresetConfig()
         self._ledger_emitter = ledger_emitter
+        # Surfaced health signal: ledger emission failures are otherwise
+        # swallowed while route_and_compress still reports success, leaving a
+        # provenance gap invisible to operators (NN4).
+        self.ledger_emit_failures = 0
 
     def route_and_compress(
         self,
@@ -951,11 +955,18 @@ class CodingAgentPreset:
         ccr_marker = explicit_ccr_marker
         ccr_hash = explicit_ccr_hash
         if ccr_hash is None:
+            # Any CCR marker we can only find by parsing the (possibly
+            # untrusted) content is producer-asserted: an attacker controlling
+            # a tool output can inject an arbitrary hash + N->M line claim
+            # (NN2/NN1). We only treat the hash as authoritative if a store
+            # entry with that exact hash actually exists locally; otherwise the
+            # in-band marker is dropped, not promoted to result metadata.
             markers = parse_ccr_markers(compressed)
             if markers:
                 marker = markers[-1]
-                ccr_hash = marker.hash
-                ccr_marker = marker.raw
+                if self._ccr_hash_is_verifiable(marker.hash):
+                    ccr_hash = marker.hash
+                    ccr_marker = marker.raw
 
         result_metadata = {
             "source_type": source_type,
@@ -982,6 +993,23 @@ class CodingAgentPreset:
             metadata=result_metadata,
         )
 
+    def _ccr_hash_is_verifiable(self, hash_value: str | None) -> bool:
+        """Return True only if a local CCR store entry with this hash exists.
+
+        An in-band marker hash is producer-asserted and must be authenticated
+        against the real store before it is treated as authoritative retrieval
+        evidence (F33 / NN2). A forged hash that was never stored returns False.
+        """
+        if not hash_value:
+            return False
+        try:
+            from headroom.cache.compression_store import get_compression_store
+
+            return bool(get_compression_store().exists(hash_value))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("CCR hash verification failed for %s: %s", hash_value, exc)
+            return False
+
     def _emit_ledger_event(
         self,
         result: CodingAgentPresetResult,
@@ -996,12 +1024,12 @@ class CodingAgentPreset:
             )
 
             emitter = self._ledger_emitter or get_ledger_emitter()
-            original_tokens = int(
-                result.metadata.get("original_tokens") or estimate_tokens(result.original)
-            )
-            compressed_tokens = int(
-                result.metadata.get("compressed_tokens") or estimate_tokens(result.compressed)
-            )
+            # The ledger event declares token_count_method=TOKEN_COUNT_METHOD
+            # ('estimated_chars_div_4'), so saved_tokens must be computed by THAT
+            # method. result.metadata['*_tokens'] holds word counts (len(.split()))
+            # for other consumers; emitting them here would mislabel the savings.
+            original_tokens = estimate_tokens(result.original)
+            compressed_tokens = estimate_tokens(result.compressed)
             saved_tokens = max(0, original_tokens - compressed_tokens)
             event_type = (
                 "bridge.compression.bypassed"
@@ -1044,7 +1072,20 @@ class CodingAgentPreset:
                 )
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Ledger emission failed for %s: %s", result.source_type, exc)
+            self.ledger_emit_failures += 1
+            # Surface the gap on the result so operators can detect that a
+            # successful compression has no corresponding ledger event.
+            try:
+                result.metadata["ledger_emit_failed"] = True
+                result.metadata["ledger_error"] = f"{type(exc).__name__}: {exc}"
+            except Exception:  # noqa: BLE001
+                pass
+            logger.warning(
+                "Ledger emission failed for %s (ledger_emit_failures=%d): %s",
+                result.source_type,
+                self.ledger_emit_failures,
+                exc,
+            )
 
     def _short_json(self, value: Any, *, limit: int = 240) -> str:
         if isinstance(value, str):

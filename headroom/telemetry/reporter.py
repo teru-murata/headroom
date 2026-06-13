@@ -20,6 +20,8 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 from dataclasses import asdict, dataclass, field
@@ -232,6 +234,32 @@ class UsageReporter:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _integrity_key(self) -> bytes:
+        """Shared secret for signing local evidence (usage reports + cache).
+
+        Derived from the license key so a cache or report can only be produced
+        by a holder of the key, not by an offline party editing a JSON file.
+        """
+        return hashlib.sha256(
+            b"headroom-telemetry-v1:" + self._license_key.encode("utf-8")
+        ).digest()
+
+    def _sign_usage_payload(self, payload: dict[str, Any]) -> str:
+        canonical = json.dumps(
+            {k: v for k, v in payload.items() if k != "signature"},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hmac.new(self._integrity_key(), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def _sign_cache(self, data: dict[str, Any]) -> str:
+        canonical = json.dumps(
+            {k: v for k, v in data.items() if k != "signature"},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hmac.new(self._integrity_key(), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+
     async def _get_client(self) -> httpx.AsyncClient:
         if self._http_client is None:
             self._http_client = httpx.AsyncClient(
@@ -310,6 +338,11 @@ class UsageReporter:
             "tokens_saved": total_tokens_saved,
             "models": delta_reqs_by_model,
         }
+        # NN1: aggregate counts are self-reported. Bind the producer's license
+        # key to the exact claimed figures via an HMAC so the cloud can verify
+        # the report is non-repudiably committed by this key and admit it
+        # through a recount/admission lane rather than trusting raw numbers.
+        payload["signature"] = self._sign_usage_payload(payload)
 
         try:
             client = await self._get_client()
@@ -357,9 +390,11 @@ class UsageReporter:
             return
         try:
             self._cache_path.parent.mkdir(parents=True, exist_ok=True)
-            self._cache_path.write_text(
-                json.dumps(self._license_info.to_dict(), indent=2), encoding="utf-8"
-            )
+            data = self._license_info.to_dict()
+            # Bind cache integrity to the license key so an offline party cannot
+            # forge an "active" entitlement by writing a plain JSON file (NN2).
+            data["signature"] = self._sign_cache(data)
+            self._cache_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except OSError:
             logger.warning("Could not save license cache to %s", self._cache_path)
 
@@ -368,6 +403,25 @@ class UsageReporter:
         try:
             if self._cache_path.exists():
                 data = json.loads(self._cache_path.read_text(encoding="utf-8"))
+                # Verify cache integrity: a cache the cloud-validated path never
+                # produced (no/invalid HMAC signature) must not grant entitlement.
+                supplied_sig = data.get("signature")
+                expected_sig = self._sign_cache(data)
+                if not isinstance(supplied_sig, str) or not hmac.compare_digest(
+                    supplied_sig, expected_sig
+                ):
+                    logger.warning(
+                        "License cache at %s failed integrity check; ignoring",
+                        self._cache_path,
+                    )
+                    # A forged/unvalidated cache has no prior cloud validation,
+                    # so the grace window must not apply: backdate validated_at
+                    # beyond the grace period to deny compression definitively.
+                    self._license_info = LicenseInfo(
+                        status="expired",
+                        validated_at=datetime.fromtimestamp(0, tz=timezone.utc),
+                    )
+                    return self._license_info
                 cached = LicenseInfo.from_dict(data)
                 age = (datetime.now(timezone.utc) - cached.validated_at).total_seconds()
                 if age < GRACE_PERIOD_SECONDS:
