@@ -85,10 +85,17 @@ class TelemetryCollector:
         # Retrieval tracking
         self._retrieval_stats: dict[str, RetrievalStats] = {}
 
-        # Global counters
+        # Global counters (authoritative: locally-observed events only)
         self._total_compressions: int = 0
         self._total_retrievals: int = 0
         self._total_tokens_saved: int = 0
+
+        # Imported aggregates from cross-user/external sources are kept in a
+        # separate provenance bucket and are NOT surfaced as authoritative
+        # totals (NN1: self-reported external numbers are not evidence).
+        self._imported_compressions: int = 0
+        self._imported_retrievals: int = 0
+        self._imported_tokens_saved: int = 0
 
         # Auto-save tracking
         self._last_save_time: float = time.time()
@@ -273,6 +280,10 @@ class TelemetryCollector:
                 "events_in_memory": len(self._events),
                 "avg_compression_ratio": self._calculate_avg_compression_ratio(),
                 "avg_token_reduction": self._calculate_avg_token_reduction(),
+                # Segregated, unverified cross-user aggregates (not authoritative).
+                "imported_compressions": self._imported_compressions,
+                "imported_retrievals": self._imported_retrievals,
+                "imported_tokens_saved": self._imported_tokens_saved,
             }
 
     def get_tool_stats(self, signature_hash: str) -> AnonymizedToolStats | None:
@@ -360,22 +371,36 @@ class TelemetryCollector:
             return export
 
     def import_stats(self, data: dict[str, Any]) -> None:
-        """Import telemetry data from another source.
+        """Import telemetry data from another (untrusted, cross-user) source.
 
         This allows merging stats from multiple users for cross-user learning.
+        The summary aggregates are self-reported by an external party and are
+        NOT evidence (NN1): they are folded into a SEPARATE imported-provenance
+        bucket and never into the authoritative locally-observed totals that
+        ``get_stats`` surfaces. Tool-signature distributions are still merged
+        for learning.
 
         Args:
             data: Exported telemetry data.
         """
+        self._import_stats(data, trusted=False)
+
+    def _import_stats(self, data: dict[str, Any], *, trusted: bool) -> None:
         if not self._config.enabled:
             return
 
         with self._lock:
-            # Import summary counters
+            # Summary counters. Trusted restores (own on-disk persistence) fold
+            # into authoritative totals; untrusted imports stay segregated.
             summary = data.get("summary", {})
-            self._total_compressions += summary.get("total_compressions", 0)
-            self._total_retrievals += summary.get("total_retrievals", 0)
-            self._total_tokens_saved += summary.get("total_tokens_saved", 0)
+            if trusted:
+                self._total_compressions += summary.get("total_compressions", 0)
+                self._total_retrievals += summary.get("total_retrievals", 0)
+                self._total_tokens_saved += summary.get("total_tokens_saved", 0)
+            else:
+                self._imported_compressions += summary.get("total_compressions", 0)
+                self._imported_retrievals += summary.get("total_retrievals", 0)
+                self._imported_tokens_saved += summary.get("total_tokens_saved", 0)
 
             # Import tool stats
             tool_stats_data = data.get("tool_stats", {})
@@ -400,6 +425,9 @@ class TelemetryCollector:
             self._total_compressions = 0
             self._total_retrievals = 0
             self._total_tokens_saved = 0
+            self._imported_compressions = 0
+            self._imported_retrievals = 0
+            self._imported_tokens_saved = 0
             self._dirty = False
 
     def save(self) -> None:
@@ -455,7 +483,8 @@ class TelemetryCollector:
         try:
             with open(path) as f:
                 data = json.load(f)
-            self.import_stats(data)
+            # Reloading our own persisted snapshot is a trusted restore.
+            self._import_stats(data, trusted=True)
             self._dirty = False
         except (json.JSONDecodeError, OSError):
             pass  # Start fresh if file is corrupted
