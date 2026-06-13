@@ -112,12 +112,17 @@ fn json_tool_result_routes_to_smart_crusher() {
     match action {
         BlockAction::Compressed {
             strategy,
+            content_type,
             original_bytes,
             compressed_bytes,
             original_tokens,
             compressed_tokens,
         } => {
             assert_eq!(strategy, "smart_crusher", "expected SmartCrusher dispatch");
+            assert_eq!(
+                content_type, "json_array",
+                "manifest must surface the detected content tier (F59)"
+            );
             assert!(
                 compressed_bytes < original_bytes,
                 "SmartCrusher must produce strictly smaller output ({compressed_bytes} < {original_bytes})"

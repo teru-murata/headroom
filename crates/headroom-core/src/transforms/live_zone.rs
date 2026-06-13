@@ -281,6 +281,15 @@ pub enum BlockAction {
         /// `"log_compressor"`, ...). Static so the manifest is
         /// allocation-light.
         strategy: &'static str,
+        /// Detected content tier this block was classified as —
+        /// string tag matches `ContentType::as_str`
+        /// (`"source_code"`, `"json_array"`, `"diff"`, `"text"`, ...).
+        /// F59 remediation: the proxy's
+        /// `proxy_compression_ratio_by_strategy` metric defines its
+        /// `content_type` axis as the detection tier, so the manifest
+        /// must surface the genuine detected tier per compressed block
+        /// instead of the emit-site hardcoding `"aggregate"`.
+        content_type: &'static str,
         /// Bytes of the original block content (the JSON string
         /// value, after unescaping).
         original_bytes: usize,
@@ -920,6 +929,7 @@ fn compress_one_block(
                     block_type,
                     action: BlockAction::Compressed {
                         strategy,
+                        content_type: content_type.as_str(),
                         original_bytes,
                         compressed_bytes,
                         original_tokens,
@@ -1676,6 +1686,7 @@ mod tests {
         let m = make_manifest(vec![
             BlockAction::Compressed {
                 strategy: "smart_crusher",
+                content_type: "json_array",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 100,
@@ -1686,6 +1697,7 @@ mod tests {
             },
             BlockAction::Compressed {
                 strategy: "log_compressor",
+                content_type: "build",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 200,
@@ -1708,6 +1720,7 @@ mod tests {
         let m = make_manifest(vec![
             BlockAction::Compressed {
                 strategy: "log_compressor",
+                content_type: "build",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 50,
@@ -1715,6 +1728,7 @@ mod tests {
             },
             BlockAction::Compressed {
                 strategy: "smart_crusher",
+                content_type: "json_array",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 50,
@@ -1722,6 +1736,7 @@ mod tests {
             },
             BlockAction::Compressed {
                 strategy: "log_compressor",
+                content_type: "build",
                 original_bytes: 0,
                 compressed_bytes: 0,
                 original_tokens: 50,
@@ -1741,6 +1756,7 @@ mod tests {
         // future caller hand-constructs such a manifest.
         let m = make_manifest(vec![BlockAction::Compressed {
             strategy: "smart_crusher",
+            content_type: "json_array",
             original_bytes: 0,
             compressed_bytes: 0,
             original_tokens: 10,
