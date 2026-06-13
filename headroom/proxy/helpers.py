@@ -1034,37 +1034,49 @@ def _context_tool_summary_payload(
             ),
         )
     )
-    tokens_saved = _coerce_int(
-        _first_value(
-            summary,
-            (
-                "total_saved",
-                "tokens_saved",
-                "total_tokens_saved",
-                "saved_tokens",
-                "totalSaved",
-            ),
-        )
+    # Whether the external tool actually *reported* a saved figure. We use a
+    # sentinel rather than a 0 default so we can tell "tool said 0 saved" /
+    # "tool said nothing" apart from "tool reported a value". Without a
+    # reported saved counter we must NOT fabricate one from input - output:
+    # a tool whose input/output are raw cumulative token totals (not
+    # before/after-compression sizes) would yield a bogus, non-zero savings
+    # number that surfaces on the dashboard as real (F10).
+    _SENTINEL = object()
+    _raw_saved = _first_value(
+        summary,
+        (
+            "total_saved",
+            "tokens_saved",
+            "total_tokens_saved",
+            "saved_tokens",
+            "totalSaved",
+        ),
+        default=_SENTINEL,
     )
-    if tokens_saved <= 0 and input_tokens > 0 and output_tokens >= 0:
-        tokens_saved = max(input_tokens - output_tokens, 0)
+    tool_reported_saved = _raw_saved is not _SENTINEL
+    tokens_saved = _coerce_int(_raw_saved if tool_reported_saved else 0)
     if input_tokens <= 0 and tokens_saved > 0 and output_tokens >= 0:
         input_tokens = tokens_saved + output_tokens
 
-    lifetime_savings_pct = _coerce_float(
-        _first_value(
-            summary,
-            (
-                "avg_savings_pct",
-                "average_savings_pct",
-                "savings_pct",
-                "savings_percent",
-                "avgSavingsPct",
-            ),
-            0.0,
-        )
+    _raw_pct = _first_value(
+        summary,
+        (
+            "avg_savings_pct",
+            "average_savings_pct",
+            "savings_pct",
+            "savings_percent",
+            "avgSavingsPct",
+        ),
+        default=_SENTINEL,
     )
-    if lifetime_savings_pct <= 0 and input_tokens > 0:
+    tool_reported_pct = _raw_pct is not _SENTINEL
+    lifetime_savings_pct = _coerce_float(_raw_pct if tool_reported_pct else 0.0)
+    # Derive a percentage only from a saved figure the tool actually reported.
+    if (
+        lifetime_savings_pct <= 0
+        and tool_reported_saved
+        and input_tokens > 0
+    ):
         lifetime_savings_pct = (tokens_saved / input_tokens) * 100.0
 
     return {
@@ -1225,6 +1237,17 @@ def _read_lean_ctx_lifetime_stats() -> dict[str, Any] | None:
             timeout=5,
         )
         if result.returncode != 0 or not result.stdout.strip():
+            # Mirror _read_rtk_lifetime_stats (PR-G2): structured-log the
+            # synthetic-zero path so operators can distinguish a healthy
+            # "lean-ctx ran and saved nothing" from a broken "lean-ctx failed
+            # and we faked zero" (F09).
+            stderr_excerpt = (result.stderr or "")[:200]
+            logger.warning(
+                "event=lean_ctx_stats_subprocess_failed reason=non_zero_exit "
+                "rc=%s stderr=%r",
+                result.returncode,
+                stderr_excerpt,
+            )
             return dict(base_payload)
 
         data = json.loads(result.stdout)
@@ -1237,7 +1260,14 @@ def _read_lean_ctx_lifetime_stats() -> dict[str, Any] | None:
             installed=True,
             summary=summary,
         )
-    except Exception:
+    except Exception as exc:
+        # Mirror _read_rtk_lifetime_stats (PR-G2): log the exception path too,
+        # using the exception class name as the reason (F09).
+        logger.warning(
+            "event=lean_ctx_stats_subprocess_failed reason=%s error=%s",
+            type(exc).__name__,
+            exc,
+        )
         return dict(base_payload)
 
 
