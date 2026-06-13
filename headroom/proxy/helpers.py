@@ -2684,14 +2684,30 @@ async def _read_request_body_bytes(request: Request) -> bytes:
     encoding = (request.headers.get("content-encoding") or "").lower().strip()
     raw = await request.body()
 
+    # SECURITY: bound the DECOMPRESSED size. A small compressed body (under the
+    # Content-Length cap) can inflate to gigabytes (a decompression / "zip" bomb)
+    # and OOM the proxy. Cap inflated output at MAX_REQUEST_BODY_SIZE and stop
+    # decompression as soon as it is exceeded, rather than materializing the bomb.
+    _bomb = lambda enc: ValueError(
+        f"{enc} request body decompresses beyond the "
+        f"{MAX_REQUEST_BODY_SIZE}-byte limit (decompression bomb)"
+    )
+    _limit = MAX_REQUEST_BODY_SIZE
+
     if encoding in ("zstd", "zstandard"):
         try:
             import zstandard
 
             dctx = zstandard.ZstdDecompressor()
             reader = dctx.stream_reader(raw)
-            raw = reader.read()
+            out = reader.read(_limit + 1)
+            if len(out) > _limit or reader.read(1):
+                reader.close()
+                raise _bomb("zstd")
             reader.close()
+            raw = out
+        except ValueError:
+            raise
         except ImportError:
             raise ValueError(
                 "Request body is zstd-compressed but the 'zstandard' package is not installed. "
@@ -2699,25 +2715,35 @@ async def _read_request_body_bytes(request: Request) -> bytes:
             ) from None
         except Exception as exc:
             raise ValueError(f"Failed to decompress zstd request body: {exc}") from exc
-    elif encoding == "gzip":
-        import gzip as _gzip
-
-        try:
-            raw = _gzip.decompress(raw)
-        except Exception as exc:
-            raise ValueError(f"Failed to decompress gzip request body: {exc}") from exc
-    elif encoding == "deflate":
+    elif encoding in ("gzip", "deflate"):
         import zlib
 
+        wbits = 16 + zlib.MAX_WBITS if encoding == "gzip" else zlib.MAX_WBITS
         try:
-            raw = zlib.decompress(raw)
+            dobj = zlib.decompressobj(wbits)
+            out = dobj.decompress(raw, _limit + 1)
+            if len(out) > _limit or dobj.unconsumed_tail or dobj.decompress(b"", _limit + 1):
+                raise _bomb(encoding)
+            raw = out + dobj.flush()
+            if len(raw) > _limit:
+                raise _bomb(encoding)
+        except ValueError:
+            raise
         except Exception as exc:
-            raise ValueError(f"Failed to decompress deflate request body: {exc}") from exc
+            raise ValueError(f"Failed to decompress {encoding} request body: {exc}") from exc
     elif encoding == "br":
         try:
             import brotli
 
-            raw = brotli.decompress(raw)
+            dec = brotli.Decompressor()
+            acc = bytearray()
+            for _i in range(0, len(raw), 65536):
+                acc += dec.process(raw[_i : _i + 65536])
+                if len(acc) > _limit:
+                    raise _bomb("brotli")
+            raw = bytes(acc)
+        except ValueError:
+            raise
         except ImportError:
             raise ValueError(
                 "Request body is brotli-compressed but the 'brotli' package is not installed."
