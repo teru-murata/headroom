@@ -37,6 +37,10 @@ class EstimatingTokenCounter(BaseTokenizer):
         print(f"Estimated tokens: {tokens}")
     """
 
+    # This counter returns estimates, not exact counts. Exposed so callers can
+    # detect that exact tokenization has degraded to estimation (F46).
+    is_estimate = True
+
     # Calibration constants (derived from tiktoken analysis)
     CHARS_PER_TOKEN = 4.0  # Average for English text
     CHARS_PER_TOKEN_CODE = 3.5  # Code is denser
@@ -172,6 +176,8 @@ class CharacterCounter(BaseTokenizer):
 
     This is less accurate than EstimatingTokenCounter but faster.
     """
+
+    is_estimate = True
 
     def __init__(self, chars_per_token: float = 4.0):
         """Initialize character counter.

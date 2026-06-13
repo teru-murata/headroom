@@ -3,17 +3,70 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 from typing import Any, cast
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import Response
 
 from headroom.proxy.handlers.openai import _resolve_codex_routing_headers
 
 logger = logging.getLogger("headroom.proxy.routes")
+
+
+_BLOCKED_HOSTNAMES = frozenset({"localhost", "localhost.localdomain"})
+
+
+def _is_blocked_host(host: str) -> bool:
+    """Return True if *host* targets a private/loopback/link-local origin.
+
+    Used to defend the client-controlled ``x-headroom-base-url`` override against
+    SSRF (e.g. the cloud metadata endpoint 169.254.169.254). Literal IPs are
+    range-checked; loopback/internal hostnames are name-checked. Legitimate
+    public hostnames (Azure OpenAI, custom gateways) are allowed without a
+    forward-DNS lookup at request time.
+    """
+    if not host:
+        return True
+    host = host.strip().lower().rstrip(".")
+    # IPv6 literals arrive bracket-stripped from urlsplit.hostname already.
+    try:
+        parsed = ipaddress.ip_address(host)
+    except ValueError:
+        # Hostname (not a literal IP): block obvious loopback/internal names.
+        if host in _BLOCKED_HOSTNAMES:
+            return True
+        if host.endswith(".localhost") or host.endswith(".local"):
+            return True
+        return False
+    return (
+        parsed.is_private
+        or parsed.is_loopback
+        or parsed.is_link_local
+        or parsed.is_reserved
+        or parsed.is_multicast
+        or parsed.is_unspecified
+    )
+
+
+def _validate_custom_base_url(custom_base: str) -> str:
+    """Validate a client-supplied ``x-headroom-base-url`` override.
+
+    Rejects anything that is not a plain ``https`` (or ``http`` to an explicitly
+    public host) URL pointing at a globally-routable host. Raises HTTPException
+    (400) on a disallowed value so the catchall never proxies an arbitrary,
+    internal, attacker-chosen origin (SSRF / credential exfiltration, F45).
+    """
+    parts = urlsplit(custom_base)
+    if parts.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="invalid base URL scheme")
+    host = parts.hostname or ""
+    if _is_blocked_host(host):
+        raise HTTPException(status_code=400, detail="base URL host not allowed")
+    return custom_base.rstrip("/")
 
 
 def _api_target(proxy: Any, provider_name: str) -> str:
@@ -43,7 +96,7 @@ def _select_passthrough_base_url(proxy: Any, headers: dict[str, str]) -> str:
     if headers.get("api-key"):
         azure_base = headers.get("x-headroom-base-url", "")
         if azure_base:
-            return azure_base.rstrip("/")
+            return _validate_custom_base_url(azure_base)
     provider_name = proxy.provider_runtime.model_metadata_provider(headers)
     return _api_target(proxy, provider_name)
 
@@ -640,7 +693,9 @@ def register_provider_routes(app: FastAPI, proxy: Any) -> None:
     async def passthrough(request: Request, path: str):
         custom_base = request.headers.get("x-headroom-base-url")
         if custom_base:
-            return await proxy.handle_passthrough(request, custom_base.rstrip("/"))
+            return await proxy.handle_passthrough(
+                request, _validate_custom_base_url(custom_base)
+            )
         return await proxy.handle_passthrough(
             request,
             _select_passthrough_base_url(proxy, dict(request.headers)),
