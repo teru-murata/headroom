@@ -792,9 +792,15 @@ pub(crate) async fn forward_http(
                 // log loudly so this is visible.
                 if !per_strategy_tokens.is_empty() {
                     for entry in &per_strategy_tokens {
+                        // F59: emit the per-strategy sample under its
+                        // genuine *detected* content tier (the metric
+                        // contract defines `content_type` as the detection
+                        // tier). Previously hardcoded to "aggregate", which
+                        // collapsed every per-content-type dashboard to a
+                        // constant.
                         crate::observability::observe_compression_ratio(
                             entry.strategy,
-                            "aggregate",
+                            entry.content_type,
                             entry.original_tokens,
                             entry.compressed_tokens,
                         );

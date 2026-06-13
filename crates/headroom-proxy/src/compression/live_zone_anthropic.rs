@@ -67,6 +67,13 @@ use crate::config::{CacheControlAutoFrozen, CompressionMode};
 #[derive(Debug, Clone, Copy)]
 pub struct PerStrategyTokens {
     pub strategy: &'static str,
+    /// Detected content tier for the block(s) this sample aggregates,
+    /// matching `ContentType::as_str` (`"json_array"`, `"source_code"`,
+    /// ...). F59 remediation: the `proxy_compression_ratio_by_strategy`
+    /// metric defines `content_type` as the detection tier, so we carry
+    /// the genuine detected tier from the manifest instead of letting
+    /// the emit-site hardcode `"aggregate"`.
+    pub content_type: &'static str,
     pub original_tokens: usize,
     pub compressed_tokens: usize,
 }
@@ -441,6 +448,7 @@ pub fn compress_anthropic_request(
                 match entry.action {
                     BlockAction::Compressed {
                         strategy,
+                        content_type,
                         original_bytes,
                         compressed_bytes,
                         original_tokens,
@@ -453,18 +461,22 @@ pub fn compress_anthropic_request(
                         if !strategies.contains(&strategy) {
                             strategies.push(strategy);
                         }
-                        // H1: accumulate per-strategy tokens (one
-                        // entry per strategy; multiple blocks of
-                        // the same strategy sum).
+                        // H1 + F59: accumulate per-strategy tokens keyed
+                        // by (strategy, detected content_type) so each
+                        // sample carries the genuine detection tier the
+                        // `proxy_compression_ratio_by_strategy` metric
+                        // contract expects. Multiple blocks of the same
+                        // strategy *and* tier sum.
                         if let Some(slot) = per_strategy_tokens
                             .iter_mut()
-                            .find(|s| s.strategy == strategy)
+                            .find(|s| s.strategy == strategy && s.content_type == content_type)
                         {
                             slot.original_tokens += original_tokens;
                             slot.compressed_tokens += compressed_tokens;
                         } else {
                             per_strategy_tokens.push(PerStrategyTokens {
                                 strategy,
+                                content_type,
                                 original_tokens,
                                 compressed_tokens,
                             });

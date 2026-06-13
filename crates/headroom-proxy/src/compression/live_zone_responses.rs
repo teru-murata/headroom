@@ -192,6 +192,7 @@ pub fn compress_openai_responses_request(
                 match entry.action {
                     BlockAction::Compressed {
                         strategy,
+                        content_type,
                         original_bytes,
                         compressed_bytes,
                         original_tokens,
@@ -204,15 +205,17 @@ pub fn compress_openai_responses_request(
                         if !strategies.contains(&strategy) {
                             strategies.push(strategy);
                         }
+                        // F59: key per-strategy samples by detected tier.
                         if let Some(slot) = per_strategy_tokens
                             .iter_mut()
-                            .find(|s| s.strategy == strategy)
+                            .find(|s| s.strategy == strategy && s.content_type == content_type)
                         {
                             slot.original_tokens += original_tokens;
                             slot.compressed_tokens += compressed_tokens;
                         } else {
                             per_strategy_tokens.push(PerStrategyTokens {
                                 strategy,
+                                content_type,
                                 original_tokens,
                                 compressed_tokens,
                             });
