@@ -23,6 +23,25 @@ CCRMarkerFamily = Literal["bracket_retrieve", "angle_ccr"]
 # Local emitters currently produce:
 # - SmartCrusher row-drop / opaque markers: SHA-256 prefix, 12 hex chars.
 # - Python compression_store and Rust live-zone CCR keys: 24 hex chars.
+#
+# INTENTIONAL: accepting BOTH 12- and 24-hex lengths is by design, not a
+# weakened 24-only check. The 12-hex SmartCrusher format is a first-class
+# RETRIEVABLE marker — smart_crusher.py mirrors a 12-char SHA-256 hash to the
+# store specifically "so /v1/retrieve resolves it" (see
+# test_smartcrusher_angle_marker_parses / _opaque_blob_marker_parses). So the
+# length set must NOT be narrowed to 24-only and the retrieve path must NOT
+# reject 12-hex; either would break SmartCrusher retrieval.
+#
+# Security note (the real anti-spoof axis is tenant isolation, NOT hash
+# length): a 12-hex prefix is a 48-bit space, so a collision/brute-force can
+# only reach content WITHIN the active store. The protection that matters for
+# untrusted multi-tenant use is the per-request tenant-scoped store
+# (compression_store._request_ccr_store), which bounds any reachable content
+# to the caller's own tenant. Hosted/SaaS hardening therefore enforces that
+# tenant scoping on the retrieve path (and may add hash-length as
+# defense-in-depth) — it does not, and must not, ban 12-hex globally. This is
+# a deliberate self-host-loose / hosted-hardened differentiation
+# (owner ruling 2026-06-13), not an oversight.
 SUPPORTED_CCR_HASH_LENGTHS = frozenset({12, 24})
 
 _HASH_RE = re.compile(r"^[0-9A-Fa-f]+$")

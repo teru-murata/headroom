@@ -269,3 +269,48 @@ def test_ccr_retrieve_emits_retrieved_event() -> None:
     assert event["ccr_marker_id"] == hash_key
     assert event["ccr_backend"].endswith("Backend")
     assert event["retrieved_count"] == 1
+
+
+
+def test_ledger_token_count_method_label_matches_computation() -> None:
+    """RED for fork-review finding #2 (NN2): the coding-agent preset records
+    word-count (.split()) values in result.metadata['original_tokens'] /
+    ['compressed_tokens'], and _emit_ledger_event emits those as saved_tokens
+    while labelling token_count_method=TOKEN_COUNT_METHOD ('estimated_chars_div_4').
+    The declared method must match the emitted numbers. Isolated from the Rust
+    compressor by constructing the result directly."""
+    from headroom.telemetry.ledger import estimate_tokens
+    from headroom.presets.coding_agent import CodingAgentPresetResult
+
+    emitter = InMemoryLedgerEmitter()
+    preset = _preset(emitter)
+    original = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu"
+    compressed = "alpha beta gamma"
+    # Mirror exactly what the preset writes today: WORD COUNTS.
+    metadata = {
+        "source_type": "test_log",
+        "compression_method": "log_compressor",
+        "accuracy_guard": "coding_agent_failure_evidence",
+        "original_length": len(original),
+        "compressed_length": len(compressed),
+        "original_tokens": len(original.split()),
+        "compressed_tokens": len(compressed.split()),
+    }
+    result = CodingAgentPresetResult(
+        compressed=compressed,
+        original=original,
+        source_type="test_log",
+        compression_method="log_compressor",
+        accuracy_guard="coding_agent_failure_evidence",
+        original_length=len(original),
+        compressed_length=len(compressed),
+        metadata=metadata,
+    )
+    preset._emit_ledger_event(result, {"source_id": "x", "provider": "openai", "model": "gpt-test"})
+    event = emitter.events[0].to_dict()
+    assert event["token_count_method"] == "estimated_chars_div_4"
+    # The emitted token counts must BE the method they are labelled with.
+    assert event["original_tokens"] == estimate_tokens(original), (
+        f"label says estimated_chars_div_4 but original_tokens={event['original_tokens']} "
+        f"!= estimate_tokens={estimate_tokens(original)} (word-count vs chars/4 mislabel)"
+    )

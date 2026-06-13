@@ -996,12 +996,12 @@ class CodingAgentPreset:
             )
 
             emitter = self._ledger_emitter or get_ledger_emitter()
-            original_tokens = int(
-                result.metadata.get("original_tokens") or estimate_tokens(result.original)
-            )
-            compressed_tokens = int(
-                result.metadata.get("compressed_tokens") or estimate_tokens(result.compressed)
-            )
+            # The ledger event declares token_count_method=TOKEN_COUNT_METHOD
+            # ('estimated_chars_div_4'), so saved_tokens must be computed by THAT
+            # method. result.metadata['*_tokens'] holds word counts (len(.split()))
+            # for other consumers; emitting them here would mislabel the savings.
+            original_tokens = estimate_tokens(result.original)
+            compressed_tokens = estimate_tokens(result.compressed)
             saved_tokens = max(0, original_tokens - compressed_tokens)
             event_type = (
                 "bridge.compression.bypassed"
